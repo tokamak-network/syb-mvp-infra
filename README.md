@@ -1,6 +1,10 @@
-# Welcome to your CDK TypeScript project
+# SYB MVP Infra
 
-This is a blank project for CDK development with TypeScript.
+## Setup
+Configure AWS account, cli, node, and typescript by following the [link](https://docs.aws.amazon.com/cdk/v2/guide/prerequisites.html)
+```bash
+npm install -g aws-cdk
+```
 
 The `cdk.json` file tells the CDK Toolkit how to execute your app.
 
