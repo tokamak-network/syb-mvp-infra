@@ -1,15 +1,18 @@
 import * as cdk from 'aws-cdk-lib'
 import { Construct } from 'constructs'
 import * as ec2 from 'aws-cdk-lib/aws-ec2'
+import * as lambda from 'aws-cdk-lib/aws-lambda';
 
 interface CommonResourcesStackProps extends cdk.StackProps {
   cidrBlock: string
+  slackWebhookUrl: string
 }
 
 export class CommonResourcesStack extends cdk.Stack {
   public readonly vpc: ec2.Vpc
   public readonly rdsSecurityGroup: ec2.SecurityGroup
   public readonly bastion: ec2.Instance
+  public readonly slackNotifier: lambda.Function;
 
   constructor(scope: Construct, id: string, props: CommonResourcesStackProps) {
     super(scope, id, props)
@@ -66,5 +69,33 @@ export class CommonResourcesStack extends cdk.Stack {
       ec2.Port.tcp(5432),
       'Allow bastion host to access RDS'
     )
+
+    this.slackNotifier = new lambda.Function(this, 'SlackNotifier', {
+      runtime: lambda.Runtime.NODEJS_LATEST,
+      handler: 'index.handler',
+      code: lambda.Code.fromInline(`
+        const https = require('https');
+        exports.handler = async (event) => {
+          const message = JSON.stringify(event.Records[0].Sns.Message);
+          const options = {
+            hostname: 'hooks.slack.com',
+            path: '${props.slackWebhookUrl}',
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+            },
+          };
+          const req = https.request(options, (res) => {
+            res.on('data', (d) => process.stdout.write(d));
+          });
+          req.on('error', (e) => console.error(e));
+          req.write(message);
+          req.end();
+        };
+      `),
+      environment: {
+        SLACK_WEBHOOK_URL: props.slackWebhookUrl,
+      },
+    });
   }
 }

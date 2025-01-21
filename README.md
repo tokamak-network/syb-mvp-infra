@@ -6,6 +6,7 @@ Configure AWS account, cli, node, and typescript by following the [link](https:/
 
 ```bash
 npm install -g aws-cdk
+cp .env.example .env
 ```
 
 The `cdk.json` file tells the CDK Toolkit how to execute your app.

@@ -10,6 +10,7 @@ import * as sns from 'aws-cdk-lib/aws-sns';
 import * as lambda from 'aws-cdk-lib/aws-lambda';
 import * as targets from 'aws-cdk-lib/aws-route53-targets';
 import * as sns_subscriptions from 'aws-cdk-lib/aws-sns-subscriptions';
+import * as cloudwatch_actions from 'aws-cdk-lib/aws-cloudwatch-actions';
 
 interface EcsStackProps extends cdk.StackProps {
   vpc: ec2.Vpc;
@@ -17,6 +18,7 @@ interface EcsStackProps extends cdk.StackProps {
   serverPort: number;
   domainName: string;
   slackWebhookUrl: string;
+  slackNotifier: lambda.Function;
 }
 
 export class EcsStack extends cdk.Stack {
@@ -67,6 +69,9 @@ export class EcsStack extends cdk.Stack {
       target: route53.RecordTarget.fromAlias(new targets.LoadBalancerTarget(service.loadBalancer)),
     });
 
+    const topic = new sns.Topic(this, 'AlarmTopic');
+    topic.addSubscription(new sns_subscriptions.LambdaSubscription(props.slackNotifier));
+
     const cpuAlarm = new cloudwatch.Alarm(this, 'CpuAlarm', {
       metric: service.service.metricCpuUtilization(),
       threshold: 90,
@@ -79,37 +84,8 @@ export class EcsStack extends cdk.Stack {
       evaluationPeriods: 2,
     });
 
-    const topic = new sns.Topic(this, 'AlarmTopic');
-
-    const slackNotifier = new lambda.Function(this, 'SlackNotifier', {
-      runtime: lambda.Runtime.NODEJS_LATEST,
-      handler: 'index.handler',
-      code: lambda.Code.fromInline(`
-        const https = require('https');
-        exports.handler = async (event) => {
-          const message = JSON.stringify(event.Records[0].Sns.Message);
-          const options = {
-            hostname: 'hooks.slack.com',
-            path: '${props.slackWebhookUrl}',
-            method: 'POST',
-            headers: {
-              'Content-Type': 'application/json',
-            },
-          };
-          const req = https.request(options, (res) => {
-            res.on('data', (d) => process.stdout.write(d));
-          });
-          req.on('error', (e) => console.error(e));
-          req.write(message);
-          req.end();
-        };
-      `),
-      environment: {
-        SLACK_WEBHOOK_URL: props.slackWebhookUrl,
-      },
-    });
-
-    topic.addSubscription(new sns_subscriptions.LambdaSubscription(slackNotifier));
+    cpuAlarm.addAlarmAction(new cloudwatch_actions.SnsAction(topic));
+    memoryAlarm.addAlarmAction(new cloudwatch_actions.SnsAction(topic));
 
     props.vpc.addInterfaceEndpoint('SSM', {
       service: ec2.InterfaceVpcEndpointAwsService.SSM,
