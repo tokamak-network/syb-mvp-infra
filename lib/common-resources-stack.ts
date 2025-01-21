@@ -2,10 +2,13 @@ import * as cdk from 'aws-cdk-lib'
 import { Construct } from 'constructs'
 import * as ec2 from 'aws-cdk-lib/aws-ec2'
 import * as lambda from 'aws-cdk-lib/aws-lambda';
+import * as ecr from 'aws-cdk-lib/aws-ecr'
+import * as route53 from 'aws-cdk-lib/aws-route53'
 
 interface CommonResourcesStackProps extends cdk.StackProps {
   cidrBlock: string
   slackWebhookUrl: string
+  route53DomainName: string
 }
 
 export class CommonResourcesStack extends cdk.Stack {
@@ -13,6 +16,9 @@ export class CommonResourcesStack extends cdk.Stack {
   public readonly rdsSecurityGroup: ec2.SecurityGroup
   public readonly bastion: ec2.Instance
   public readonly slackNotifier: lambda.Function;
+  public readonly testEcrRepo: ecr.Repository;
+  public readonly mainEcrRepo: ecr.Repository;
+  public readonly route53: route53.IHostedZone
 
   constructor(scope: Construct, id: string, props: CommonResourcesStackProps) {
     super(scope, id, props)
@@ -70,6 +76,8 @@ export class CommonResourcesStack extends cdk.Stack {
       'Allow bastion host to access RDS'
     )
 
+    // TODO: Setup Codedeploy
+
     this.slackNotifier = new lambda.Function(this, 'SlackNotifier', {
       runtime: lambda.Runtime.NODEJS_LATEST,
       handler: 'index.handler',
@@ -96,6 +104,18 @@ export class CommonResourcesStack extends cdk.Stack {
       environment: {
         SLACK_WEBHOOK_URL: props.slackWebhookUrl,
       },
+    });
+
+    this.mainEcrRepo = new ecr.Repository(this, 'MainEcrRepo', {
+      repositoryName: 'main-ecr-repo',
+    })
+    
+    this.testEcrRepo = new ecr.Repository(this, 'TestEcrRepo', {
+      repositoryName: 'test-ecr-repo',
+    })
+
+    this.route53 = new route53.HostedZone(this, 'HostedZone', {
+      zoneName: props.route53DomainName,
     });
   }
 }

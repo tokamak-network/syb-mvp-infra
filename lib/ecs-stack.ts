@@ -11,6 +11,7 @@ import * as lambda from 'aws-cdk-lib/aws-lambda';
 import * as targets from 'aws-cdk-lib/aws-route53-targets';
 import * as sns_subscriptions from 'aws-cdk-lib/aws-sns-subscriptions';
 import * as cloudwatch_actions from 'aws-cdk-lib/aws-cloudwatch-actions';
+import * as autoscaling_group from 'aws-cdk-lib/aws-autoscaling';
 
 interface EcsStackProps extends cdk.StackProps {
   vpc: ec2.Vpc;
@@ -19,6 +20,8 @@ interface EcsStackProps extends cdk.StackProps {
   domainName: string;
   slackWebhookUrl: string;
   slackNotifier: lambda.Function;
+  ecrRepo: ecr.Repository;
+  route53: route53.IHostedZone;
 }
 
 export class EcsStack extends cdk.Stack {
@@ -29,15 +32,24 @@ export class EcsStack extends cdk.Stack {
       vpc: props.vpc,
     });
 
-    const repository = ecr.Repository.fromRepositoryName(this, 'EcrRepo', 'my-repo');
-
-    const taskDefinition = new ecs.FargateTaskDefinition(this, 'TaskDef', {
-      memoryLimitMiB: 512,
-      cpu: 256,
+    const autoScalingGroup = new ecs.AsgCapacityProvider(this, 'AsgCapacityProvider', {
+      autoScalingGroup: new autoscaling_group.AutoScalingGroup(this, 'DefaultAutoScalingGroup', {
+        vpc: props.vpc,
+        instanceType: new ec2.InstanceType('t2.micro'),
+        machineImage: ecs.EcsOptimizedImage.amazonLinux2(),
+        minCapacity: 1,
+        maxCapacity: 5,
+      }),
     });
 
+    cluster.addAsgCapacityProvider(autoScalingGroup);
+
+    const taskDefinition = new ecs.Ec2TaskDefinition(this, 'TaskDef');
+
     const container = taskDefinition.addContainer('AppContainer', {
-      image: ecs.ContainerImage.fromEcrRepository(repository),
+      image: ecs.ContainerImage.fromEcrRepository(props.ecrRepo),
+      memoryLimitMiB: 512,
+      cpu: 256,
       logging: ecs.LogDrivers.awsLogs({ streamPrefix: 'ecs' }),
     });
 
@@ -45,7 +57,7 @@ export class EcsStack extends cdk.Stack {
       containerPort: props.serverPort,
     });
 
-    const service = new ecs_patterns.ApplicationLoadBalancedFargateService(this, 'FargateService', {
+    const service = new ecs_patterns.ApplicationLoadBalancedEc2Service(this, 'Ec2Service', {
       cluster,
       taskDefinition,
       publicLoadBalancer: true,
@@ -53,6 +65,7 @@ export class EcsStack extends cdk.Stack {
       listenerPort: props.serverPort,
     });
 
+    // TODO: consider volume usage and make it auto upgradeable (?)
     const scaling = service.service.autoScaleTaskCount({ maxCapacity: 5 });
     scaling.scaleOnCpuUtilization('CpuScaling', {
       targetUtilizationPercent: 90,
@@ -61,11 +74,9 @@ export class EcsStack extends cdk.Stack {
       targetUtilizationPercent: 80,
     });
 
-    const zone = route53.HostedZone.fromLookup(this, 'HostedZone', {
-      domainName: props.domainName,
-    });
     new route53.ARecord(this, 'AliasRecord', {
-      zone,
+      zone: props.route53,
+      recordName: props.domainName,
       target: route53.RecordTarget.fromAlias(new targets.LoadBalancerTarget(service.loadBalancer)),
     });
 

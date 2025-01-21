@@ -7,6 +7,8 @@ import { EcsStack } from '../lib/ecs-stack'
 const CIDR_BLOCK = process.env.CIDR_BLOCK
 const SLACK_WEBHOOK_URL = process.env.SLACK_WEBHOOK_URL
 
+const ROUTE53_DOMAIN_NAME = process.env.ROUTE53_DOMAIN_NAME
+
 const CLIENT_MAIN_DOMAIN=process.env.CLIENT_MAIN_DOMAIN
 const CLIENT_TEST_DOMAIN=process.env.CLIENT_TEST_DOMAIN
 const CLIENT_MAIN_PORT=process.env.CLIENT_MAIN_PORT
@@ -22,7 +24,7 @@ const CIRCUIT_TEST_DOMAIN=process.env.CIRCUIT_TEST_DOMAIN
 const CIRCUIT_MAIN_PORT=process.env.CIRCUIT_MAIN_PORT
 const CIRCUIT_TEST_PORT=process.env.CIRCUIT_TEST_PORT
 
-if (!SLACK_WEBHOOK_URL || !CIDR_BLOCK ||
+if (!SLACK_WEBHOOK_URL || !CIDR_BLOCK || !ROUTE53_DOMAIN_NAME ||
   !CLIENT_MAIN_DOMAIN || !CLIENT_TEST_DOMAIN || !CLIENT_MAIN_PORT || !CLIENT_TEST_PORT ||
   !SEQUENCER_MAIN_DOMAIN || !SEQUENCER_TEST_DOMAIN || !SEQUENCER_MAIN_PORT || !SEQUENCER_TEST_PORT ||
   !CIRCUIT_MAIN_DOMAIN || !CIRCUIT_TEST_DOMAIN || !CIRCUIT_MAIN_PORT || !CIRCUIT_TEST_PORT
@@ -37,7 +39,8 @@ const commonResourcesStack = new CommonResourcesStack(
   'CommonResourcesStack',
   {
     cidrBlock: CIDR_BLOCK,
-    slackWebhookUrl: SLACK_WEBHOOK_URL
+    slackWebhookUrl: SLACK_WEBHOOK_URL,
+    route53DomainName: ROUTE53_DOMAIN_NAME
   }
 )
 
@@ -71,7 +74,9 @@ new EcsStack(app, 'ClientMainEcsStack', {
   domainName: CLIENT_MAIN_DOMAIN,
   slackWebhookUrl: SLACK_WEBHOOK_URL,
   vpc: commonResourcesStack.vpc,
-  slackNotifier: commonResourcesStack.slackNotifier
+  slackNotifier: commonResourcesStack.slackNotifier,
+  ecrRepo: commonResourcesStack.mainEcrRepo,
+  route53: commonResourcesStack.route53
 })
 
 new EcsStack(app, 'ClientTestEcsStack', {
@@ -80,7 +85,9 @@ new EcsStack(app, 'ClientTestEcsStack', {
   domainName: CLIENT_TEST_DOMAIN,
   slackWebhookUrl: SLACK_WEBHOOK_URL,
   vpc: commonResourcesStack.vpc,
-  slackNotifier: commonResourcesStack.slackNotifier
+  slackNotifier: commonResourcesStack.slackNotifier,
+  ecrRepo: commonResourcesStack.testEcrRepo,
+  route53: commonResourcesStack.route53
 })
 
 new EcsStack(app, 'SequencerMainEcsStack', {
@@ -89,7 +96,9 @@ new EcsStack(app, 'SequencerMainEcsStack', {
   domainName: SEQUENCER_MAIN_DOMAIN,
   slackWebhookUrl: SLACK_WEBHOOK_URL,
   vpc: commonResourcesStack.vpc,
-  slackNotifier: commonResourcesStack.slackNotifier
+  slackNotifier: commonResourcesStack.slackNotifier,
+  ecrRepo: commonResourcesStack.mainEcrRepo,
+  route53: commonResourcesStack.route53
 })
 
 new EcsStack(app, 'SequencerTestEcsStack', {
@@ -98,7 +107,9 @@ new EcsStack(app, 'SequencerTestEcsStack', {
   domainName: SEQUENCER_TEST_DOMAIN,
   slackWebhookUrl: SLACK_WEBHOOK_URL,
   vpc: commonResourcesStack.vpc,
-  slackNotifier: commonResourcesStack.slackNotifier
+  slackNotifier: commonResourcesStack.slackNotifier,
+  ecrRepo: commonResourcesStack.testEcrRepo,
+  route53: commonResourcesStack.route53
 })
 
 new EcsStack(app, 'CircuitMainEcsStack', {
@@ -107,7 +118,9 @@ new EcsStack(app, 'CircuitMainEcsStack', {
   domainName: CIRCUIT_MAIN_DOMAIN,
   slackWebhookUrl: SLACK_WEBHOOK_URL,
   vpc: commonResourcesStack.vpc,
-  slackNotifier: commonResourcesStack.slackNotifier
+  slackNotifier: commonResourcesStack.slackNotifier,
+  ecrRepo: commonResourcesStack.mainEcrRepo,
+  route53: commonResourcesStack.route53
 })
 
 new EcsStack(app, 'CircuitTestEcsStack', {
@@ -116,5 +129,7 @@ new EcsStack(app, 'CircuitTestEcsStack', {
   domainName: CIRCUIT_TEST_DOMAIN,
   slackWebhookUrl: SLACK_WEBHOOK_URL,
   vpc: commonResourcesStack.vpc,
-  slackNotifier: commonResourcesStack.slackNotifier
+  slackNotifier: commonResourcesStack.slackNotifier,
+  ecrRepo: commonResourcesStack.testEcrRepo,
+  route53: commonResourcesStack.route53
 })
