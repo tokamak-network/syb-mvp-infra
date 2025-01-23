@@ -1,7 +1,7 @@
 import * as cdk from 'aws-cdk-lib'
 import { Construct } from 'constructs'
 import * as ec2 from 'aws-cdk-lib/aws-ec2'
-import * as lambda from 'aws-cdk-lib/aws-lambda';
+import * as lambda from 'aws-cdk-lib/aws-lambda'
 import * as ecr from 'aws-cdk-lib/aws-ecr'
 import * as route53 from 'aws-cdk-lib/aws-route53'
 
@@ -15,9 +15,9 @@ export class CommonResourcesStack extends cdk.Stack {
   public readonly vpc: ec2.Vpc
   public readonly rdsSecurityGroup: ec2.SecurityGroup
   public readonly bastion: ec2.Instance
-  public readonly slackNotifier: lambda.Function;
-  public readonly testEcrRepo: ecr.Repository;
-  public readonly mainEcrRepo: ecr.Repository;
+  public readonly slackNotifier: lambda.Function
+  public readonly testEcrRepo: ecr.Repository
+  public readonly mainEcrRepo: ecr.Repository
   public readonly route53: route53.IHostedZone
 
   constructor(scope: Construct, id: string, props: CommonResourcesStackProps) {
@@ -81,41 +81,24 @@ export class CommonResourcesStack extends cdk.Stack {
     this.slackNotifier = new lambda.Function(this, 'SlackNotifier', {
       runtime: lambda.Runtime.NODEJS_LATEST,
       handler: 'index.handler',
-      code: lambda.Code.fromInline(`
-        const https = require('https');
-        exports.handler = async (event) => {
-          const message = JSON.stringify(event.Records[0].Sns.Message);
-          const options = {
-            hostname: 'hooks.slack.com',
-            path: '${props.slackWebhookUrl}',
-            method: 'POST',
-            headers: {
-              'Content-Type': 'application/json',
-            },
-          };
-          const req = https.request(options, (res) => {
-            res.on('data', (d) => process.stdout.write(d));
-          });
-          req.on('error', (e) => console.error(e));
-          req.write(message);
-          req.end();
-        };
-      `),
+      code: lambda.Code.fromAsset(
+        __dirname + '/lambda-handlers/slack-notifier.js'
+      ),
       environment: {
-        SLACK_WEBHOOK_URL: props.slackWebhookUrl,
-      },
-    });
+        SLACK_WEBHOOK_URL: props.slackWebhookUrl
+      }
+    })
 
     this.mainEcrRepo = new ecr.Repository(this, 'MainEcrRepo', {
-      repositoryName: 'main-ecr-repo',
+      repositoryName: 'main-ecr-repo'
     })
-    
+
     this.testEcrRepo = new ecr.Repository(this, 'TestEcrRepo', {
-      repositoryName: 'test-ecr-repo',
+      repositoryName: 'test-ecr-repo'
     })
 
     this.route53 = new route53.HostedZone(this, 'HostedZone', {
-      zoneName: props.route53DomainName,
-    });
+      zoneName: props.route53DomainName
+    })
   }
 }
