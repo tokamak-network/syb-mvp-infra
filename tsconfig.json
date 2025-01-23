@@ -27,5 +27,10 @@
   "exclude": [
     "node_modules",
     "cdk.out"
+  ],
+  "include": [
+    "bin/**/*.ts",
+    "lib/**/*.ts",
+    "test/**/*.ts"
   ]
 }
