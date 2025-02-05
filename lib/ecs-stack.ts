@@ -2,7 +2,6 @@ import * as cdk from 'aws-cdk-lib'
 import { Construct } from 'constructs'
 import * as ec2 from 'aws-cdk-lib/aws-ec2'
 import * as ecs from 'aws-cdk-lib/aws-ecs'
-import * as ecs_patterns from 'aws-cdk-lib/aws-ecs-patterns'
 import * as ecr from 'aws-cdk-lib/aws-ecr'
 import * as route53 from 'aws-cdk-lib/aws-route53'
 import * as cloudwatch from 'aws-cdk-lib/aws-cloudwatch'
@@ -13,6 +12,8 @@ import * as sns_subscriptions from 'aws-cdk-lib/aws-sns-subscriptions'
 import * as cloudwatch_actions from 'aws-cdk-lib/aws-cloudwatch-actions'
 import * as autoscaling from 'aws-cdk-lib/aws-autoscaling'
 import * as iam from 'aws-cdk-lib/aws-iam'
+import * as codedeploy from 'aws-cdk-lib/aws-codedeploy'
+import * as elbv2 from 'aws-cdk-lib/aws-elasticloadbalancingv2'
 
 interface EcsStackProps extends cdk.StackProps {
   vpc: ec2.Vpc
@@ -71,19 +72,54 @@ export class EcsStack extends cdk.Stack {
       containerPort: props.serverPort
     })
 
-    const service = new ecs_patterns.ApplicationLoadBalancedEc2Service(
+    const service = new ecs.Ec2Service(this, 'Ec2Service', {
+      cluster,
+      taskDefinition,
+      deploymentController: {
+        type: ecs.DeploymentControllerType.CODE_DEPLOY
+      }
+    })
+
+    const loadBalancer = new elbv2.ApplicationLoadBalancer(this, 'LB', {
+      vpc: props.vpc,
+      internetFacing: true
+    })
+
+    const listener = loadBalancer.addListener('Listener', {
+      port: props.serverPort
+    })
+
+    const blueTargetGroup = listener.addTargets('BlueTargetGroup', {
+      port: props.serverPort,
+      targets: [service]
+    })
+
+    const greenTargetGroup = new elbv2.ApplicationTargetGroup(
       this,
-      'Ec2Service',
+      'GreenTargetGroup',
       {
-        cluster,
-        taskDefinition,
-        publicLoadBalancer: true,
-        desiredCount: 1,
-        listenerPort: props.serverPort
+        vpc: props.vpc,
+        port: props.serverPort,
+        targetType: elbv2.TargetType.INSTANCE
       }
     )
 
-    const scaling = service.service.autoScaleTaskCount({ maxCapacity: 5 })
+    const codeDeployApp = new codedeploy.EcsApplication(this, 'CodeDeployApp', {
+      applicationName: props.service
+    })
+
+    new codedeploy.EcsDeploymentGroup(this, 'BlueGreenDG', {
+      application: codeDeployApp,
+      service,
+      blueGreenDeploymentConfig: {
+        blueTargetGroup,
+        greenTargetGroup,
+        listener
+      },
+      deploymentConfig: codedeploy.EcsDeploymentConfig.CANARY_10PERCENT_5MINUTES
+    })
+
+    const scaling = service.autoScaleTaskCount({ maxCapacity: 5 })
     scaling.scaleOnCpuUtilization('CpuScaling', {
       targetUtilizationPercent: 90
     })
@@ -95,7 +131,7 @@ export class EcsStack extends cdk.Stack {
       zone: props.route53,
       recordName: props.domainName,
       target: route53.RecordTarget.fromAlias(
-        new targets.LoadBalancerTarget(service.loadBalancer)
+        new targets.LoadBalancerTarget(loadBalancer)
       )
     })
 
@@ -105,13 +141,13 @@ export class EcsStack extends cdk.Stack {
     )
 
     const cpuAlarm = new cloudwatch.Alarm(this, 'CpuAlarm', {
-      metric: service.service.metricCpuUtilization(),
+      metric: service.metricCpuUtilization(),
       threshold: 90,
       evaluationPeriods: 2
     })
 
     const memoryAlarm = new cloudwatch.Alarm(this, 'MemoryAlarm', {
-      metric: service.service.metricMemoryUtilization(),
+      metric: service.metricMemoryUtilization(),
       threshold: 80,
       evaluationPeriods: 2
     })
@@ -138,14 +174,12 @@ export class EcsStack extends cdk.Stack {
       ec2.Port.tcp(props.serverPort),
       'Allow traffic to server port'
     )
-    service.service.connections.addSecurityGroup(ecsSecurityGroup)
+    service.connections.addSecurityGroup(ecsSecurityGroup)
 
-    // sequencer uses key-value database which will be persisted on a volume
-    // all sequencer instances will have the same volume attached and this volume should NOT be deleted on termination
     if (props.service === 'sequencer') {
       const volume = new ec2.CfnVolume(this, 'SequencerPersistentVolume', {
         availabilityZone: props.vpc.availabilityZones[0],
-        size: 20, // Size in GB
+        size: 20,
         volumeType: 'gp2'
       })
 
