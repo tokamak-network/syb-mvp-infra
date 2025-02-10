@@ -80,8 +80,6 @@ export class CommonResourcesStack extends cdk.Stack {
       'Allow bastion host to access RDS'
     )
 
-    // TODO: Setup Codedeploy
-
     this.slackNotifier = new lambda.Function(this, 'SlackNotifier', {
       runtime: lambda.Runtime.NODEJS_LATEST,
       handler: 'index.handler',
