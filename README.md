@@ -21,6 +21,8 @@ ssh -i /path/to/your-key-pair.pem -L 5432:<rds-endpoint>:5432 ec2-user@<bastion-
 
 Configure your DBMS tool to connect to `localhost:5432` to access the RDS.
 
+## Create Stacks
+
 ## Useful commands
 
 - `yarn build` compile typescript to js
