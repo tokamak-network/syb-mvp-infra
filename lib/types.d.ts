@@ -1,5 +1,3 @@
-declare global {
-    type Service = 'sequencer' | 'client' | 'circuit'
-}
+declare global {}
 
-export {};
+export {}
