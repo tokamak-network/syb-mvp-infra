@@ -100,7 +100,11 @@ export class CommonResourcesStack extends cdk.Stack {
     })
 
     this.route53 = new route53.HostedZone(this, 'HostedZone', {
-      zoneName: props.route53DomainName
+      zoneName: props.route53DomainName,
+      vpcs: [this.vpc]
+    })
+    new cdk.CfnOutput(this, 'NameServers', {
+      value: cdk.Fn.join(', ', this.route53.hostedZoneNameServers || [])
     })
 
     const budgetNotificationTopic = new sns.Topic(
