@@ -23,10 +23,10 @@ Configure your DBMS tool to connect to `localhost:5432` to access the RDS.
 
 ## Create Stacks
 
-- Bootstrap CDK to prepare the repo for stack creation (only one time per AZ):
+- Bootstrap CDK to prepare the repo for stack creation (only one time per account & region):
 
 ```bash
-cdk bootstrap aws://<account_id>/<region>
+cdk bootstrap
 ```
 
 ## Useful commands
