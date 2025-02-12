@@ -15,6 +15,9 @@ import * as iam from 'aws-cdk-lib/aws-iam'
 import * as codedeploy from 'aws-cdk-lib/aws-codedeploy'
 import * as elbv2 from 'aws-cdk-lib/aws-elasticloadbalancingv2'
 
+export type Service = 'sequencer' | 'client' | 'circuit'
+export type Env = 'main' | 'test'
+
 interface EcsStackProps extends cdk.StackProps {
   vpc: ec2.Vpc
   cidrBlock: string
@@ -25,6 +28,7 @@ interface EcsStackProps extends cdk.StackProps {
   ecrRepo: ecr.Repository
   route53: route53.IHostedZone
   service: Service
+  deploymentEnv: Env
 }
 
 export class EcsStack extends cdk.Stack {
@@ -86,12 +90,14 @@ export class EcsStack extends cdk.Stack {
     })
 
     const listener = loadBalancer.addListener('Listener', {
-      port: props.serverPort
+      port: props.serverPort,
+      protocol: elbv2.ApplicationProtocol.HTTP
     })
 
     const blueTargetGroup = listener.addTargets('BlueTargetGroup', {
       port: props.serverPort,
-      targets: [service]
+      targets: [service],
+      protocol: elbv2.ApplicationProtocol.HTTP
     })
 
     const greenTargetGroup = new elbv2.ApplicationTargetGroup(
@@ -100,7 +106,8 @@ export class EcsStack extends cdk.Stack {
       {
         vpc: props.vpc,
         port: props.serverPort,
-        targetType: elbv2.TargetType.INSTANCE
+        targetType: elbv2.TargetType.INSTANCE,
+        protocol: elbv2.ApplicationProtocol.HTTP
       }
     )
 
@@ -135,7 +142,10 @@ export class EcsStack extends cdk.Stack {
       )
     })
 
-    const topic = new sns.Topic(this, 'AlarmTopic')
+    const topic = new sns.Topic(
+      this,
+      `AlarmTopic-${props.service}-${props.deploymentEnv}`
+    )
     topic.addSubscription(
       new sns_subscriptions.LambdaSubscription(props.slackNotifier)
     )
@@ -155,15 +165,24 @@ export class EcsStack extends cdk.Stack {
     cpuAlarm.addAlarmAction(new cloudwatch_actions.SnsAction(topic))
     memoryAlarm.addAlarmAction(new cloudwatch_actions.SnsAction(topic))
 
-    props.vpc.addInterfaceEndpoint('SSM', {
-      service: ec2.InterfaceVpcEndpointAwsService.SSM
-    })
-    props.vpc.addInterfaceEndpoint('SSMMessages', {
-      service: ec2.InterfaceVpcEndpointAwsService.SSM_MESSAGES
-    })
-    props.vpc.addInterfaceEndpoint('EC2Messages', {
-      service: ec2.InterfaceVpcEndpointAwsService.EC2_MESSAGES
-    })
+    props.vpc.addInterfaceEndpoint(
+      `SSM-${props.service}-${props.deploymentEnv}`,
+      {
+        service: ec2.InterfaceVpcEndpointAwsService.SSM
+      }
+    )
+    props.vpc.addInterfaceEndpoint(
+      `SSMMessages-${props.service}-${props.deploymentEnv}`,
+      {
+        service: ec2.InterfaceVpcEndpointAwsService.SSM_MESSAGES
+      }
+    )
+    props.vpc.addInterfaceEndpoint(
+      `EC2Messages-${props.service}-${props.deploymentEnv}`,
+      {
+        service: ec2.InterfaceVpcEndpointAwsService.EC2_MESSAGES
+      }
+    )
 
     const ecsSecurityGroup = new ec2.SecurityGroup(this, 'EcsSecurityGroup', {
       vpc: props.vpc,
@@ -218,7 +237,7 @@ export class EcsStack extends cdk.Stack {
           runtime: lambda.Runtime.NODEJS_LATEST,
           handler: 'index.handler',
           code: lambda.Code.fromAsset(
-            __dirname + '/lambda-handlers/scale-sequencer-volume.js'
+            __dirname + '/lambda-handlers/scale-sequencer-volume'
           ),
           role: lambdaRole
         }

@@ -23,6 +23,12 @@ Configure your DBMS tool to connect to `localhost:5432` to access the RDS.
 
 ## Create Stacks
 
+- Bootstrap CDK to prepare the repo for stack creation (only one time per account & region):
+
+```bash
+cdk bootstrap
+```
+
 ## Useful commands
 
 - `yarn build` compile typescript to js

@@ -28,7 +28,7 @@ export class CommonResourcesStack extends cdk.Stack {
     super(scope, id, props)
 
     this.vpc = new ec2.Vpc(this, 'ProdVPC', {
-      cidr: props.cidrBlock,
+      ipAddresses: ec2.IpAddresses.cidr(props.cidrBlock),
       maxAzs: 1,
       subnetConfiguration: [
         {
@@ -65,7 +65,9 @@ export class CommonResourcesStack extends cdk.Stack {
       vpcSubnets: {
         subnetType: ec2.SubnetType.PUBLIC
       },
-      keyName: 'bastion-key-name' // TODO: To be replaced with actual key name
+      keyPair: ec2.KeyPair.fromKeyPairAttributes(this, 'KeyPair', {
+        keyPairName: 'bastion-key-name'
+      }) // TODO: To be replaced with actual key name
     })
 
     this.bastion.connections.allowFrom(
@@ -84,7 +86,7 @@ export class CommonResourcesStack extends cdk.Stack {
       runtime: lambda.Runtime.NODEJS_LATEST,
       handler: 'index.handler',
       code: lambda.Code.fromAsset(
-        __dirname + '/lambda-handlers/slack-notifier.js'
+        __dirname + '/lambda-handlers/slack-notifier'
       ),
       environment: {
         SLACK_WEBHOOK_URL: props.slackWebhookUrl
@@ -116,7 +118,7 @@ export class CommonResourcesStack extends cdk.Stack {
       runtime: lambda.Runtime.NODEJS_LATEST,
       handler: 'index.handler',
       code: lambda.Code.fromAsset(
-        __dirname + '/lambda-handlers/budget-notifier.js'
+        __dirname + '/lambda-handlers/budget-notifier'
       ),
       environment: {
         SLACK_WEBHOOK_URL: props.slackWebhookUrl
