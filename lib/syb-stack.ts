@@ -7,24 +7,26 @@ import * as route53 from 'aws-cdk-lib/aws-route53'
 import * as budgets from 'aws-cdk-lib/aws-budgets'
 import * as sns from 'aws-cdk-lib/aws-sns'
 import * as sns_subscriptions from 'aws-cdk-lib/aws-sns-subscriptions'
+import { EcsConstruct } from './constructs/ecs-construct'
+import { RdsConstruct } from './constructs/rds-construct'
 
-interface CommonResourcesStackProps extends cdk.StackProps {
+interface SybStackProps extends cdk.StackProps {
   cidrBlock: string
   slackWebhookUrl: string
   route53DomainName: string
   monthlyBudgetLimit: number
+  deploymentEnv: 'main' | 'test'
 }
 
-export class CommonResourcesStack extends cdk.Stack {
+export class SybStack extends cdk.Stack {
   public readonly vpc: ec2.Vpc
   public readonly rdsSecurityGroup: ec2.SecurityGroup
   public readonly bastion: ec2.Instance
   public readonly slackNotifier: lambda.Function
-  public readonly testEcrRepo: ecr.Repository
-  public readonly mainEcrRepo: ecr.Repository
+  public readonly ecrRepo: ecr.Repository
   public readonly route53: route53.IHostedZone
 
-  constructor(scope: Construct, id: string, props: CommonResourcesStackProps) {
+  constructor(scope: Construct, id: string, props: SybStackProps) {
     super(scope, id, props)
 
     this.vpc = new ec2.Vpc(this, 'ProdVPC', {
@@ -93,12 +95,8 @@ export class CommonResourcesStack extends cdk.Stack {
       }
     })
 
-    this.mainEcrRepo = new ecr.Repository(this, 'MainEcrRepo', {
+    this.ecrRepo = new ecr.Repository(this, 'EcrRepo', {
       repositoryName: 'main-ecr-repo'
-    })
-
-    this.testEcrRepo = new ecr.Repository(this, 'TestEcrRepo', {
-      repositoryName: 'test-ecr-repo'
     })
 
     this.route53 = new route53.HostedZone(this, 'HostedZone', {
@@ -167,6 +165,41 @@ export class CommonResourcesStack extends cdk.Stack {
           ]
         }
       ]
+    })
+
+    // sequencer ECS resources
+    new EcsConstruct(this, 'EcsConstruct', {
+      vpc: this.vpc,
+      slackNotifier: this.slackNotifier,
+      ecrRepo: this.ecrRepo,
+      route53: this.route53,
+      slackWebhookUrl: props.slackWebhookUrl,
+      cidrBlock: props.cidrBlock,
+      service: 'sequencer',
+      deploymentEnv: props.deploymentEnv,
+      serverPort: 5000, // TODO: hardcoded
+      domainName: 'sequencer' // TODO: hardcoded
+    })
+
+    // sequencer RDS resources
+    new RdsConstruct(this, 'RdsConstruct', {
+      vpc: this.vpc,
+      cidrBlock: props.cidrBlock,
+      rdsSecurityGroup: this.rdsSecurityGroup
+    })
+
+    // circuit ECS resources
+    new EcsConstruct(this, 'CircuitEcsConstruct', {
+      vpc: this.vpc,
+      slackNotifier: this.slackNotifier,
+      ecrRepo: this.ecrRepo,
+      route53: this.route53,
+      slackWebhookUrl: props.slackWebhookUrl,
+      cidrBlock: props.cidrBlock,
+      service: 'circuit',
+      deploymentEnv: props.deploymentEnv,
+      serverPort: 5000, // TODO: hardcoded
+      domainName: 'circuit' // TODO: hardcoded
     })
   }
 }

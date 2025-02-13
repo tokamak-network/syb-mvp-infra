@@ -18,7 +18,7 @@ import * as elbv2 from 'aws-cdk-lib/aws-elasticloadbalancingv2'
 export type Service = 'sequencer' | 'client' | 'circuit'
 export type Env = 'main' | 'test'
 
-interface EcsStackProps extends cdk.StackProps {
+interface EcsConstructProps extends cdk.StackProps {
   vpc: ec2.Vpc
   cidrBlock: string
   serverPort: number
@@ -31,9 +31,9 @@ interface EcsStackProps extends cdk.StackProps {
   deploymentEnv: Env
 }
 
-export class EcsStack extends cdk.Stack {
-  constructor(scope: Construct, id: string, props: EcsStackProps) {
-    super(scope, id, props)
+export class EcsConstruct extends Construct {
+  constructor(scope: Construct, id: string, props: EcsConstructProps) {
+    super(scope, id)
 
     const cluster = new ecs.Cluster(this, 'EcsCluster', {
       vpc: props.vpc
@@ -237,7 +237,7 @@ export class EcsStack extends cdk.Stack {
           runtime: lambda.Runtime.NODEJS_LATEST,
           handler: 'index.handler',
           code: lambda.Code.fromAsset(
-            __dirname + '/lambda-handlers/scale-sequencer-volume'
+            __dirname + './../lambda-handlers/scale-sequencer-volume'
           ),
           role: lambdaRole
         }
