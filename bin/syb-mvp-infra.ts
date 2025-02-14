@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 import * as cdk from 'aws-cdk-lib'
 import * as dotenv from 'dotenv'
-import { SybStack } from '../lib/syb-stack'
+import { SybMvpStack } from '../lib/syb-mvp-stack'
 
 dotenv.config()
 
@@ -38,7 +38,7 @@ if (!CIRCUIT_MAIN_DOMAIN || !CIRCUIT_MAIN_PORT) {
 
 const app = new cdk.App()
 
-new SybStack(app, 'SybMainStack', {
+new SybMvpStack(app, 'SybMainStack', {
   cidrBlock: CIDR_BLOCK,
   slackWebhookUrl: SLACK_WEBHOOK_URL,
   route53DomainName: ROUTE53_DOMAIN_NAME,
@@ -46,7 +46,7 @@ new SybStack(app, 'SybMainStack', {
   deploymentEnv: 'main'
 })
 
-new SybStack(app, 'SybTestStack', {
+new SybMvpStack(app, 'SybTestStack', {
   cidrBlock: CIDR_BLOCK,
   slackWebhookUrl: SLACK_WEBHOOK_URL,
   route53DomainName: ROUTE53_DOMAIN_NAME,

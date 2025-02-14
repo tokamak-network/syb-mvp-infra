@@ -10,7 +10,7 @@ import * as sns_subscriptions from 'aws-cdk-lib/aws-sns-subscriptions'
 import { EcsConstruct } from './constructs/ecs-construct'
 import { RdsConstruct } from './constructs/rds-construct'
 
-interface SybStackProps extends cdk.StackProps {
+interface SybMvpStackProps extends cdk.StackProps {
   cidrBlock: string
   slackWebhookUrl: string
   route53DomainName: string
@@ -18,7 +18,7 @@ interface SybStackProps extends cdk.StackProps {
   deploymentEnv: 'main' | 'test'
 }
 
-export class SybStack extends cdk.Stack {
+export class SybMvpStack extends cdk.Stack {
   public readonly vpc: ec2.Vpc
   public readonly rdsSecurityGroup: ec2.SecurityGroup
   public readonly bastion: ec2.Instance
@@ -26,7 +26,7 @@ export class SybStack extends cdk.Stack {
   public readonly ecrRepo: ecr.Repository
   public readonly route53: route53.IHostedZone
 
-  constructor(scope: Construct, id: string, props: SybStackProps) {
+  constructor(scope: Construct, id: string, props: SybMvpStackProps) {
     super(scope, id, props)
 
     this.vpc = new ec2.Vpc(this, 'ProdVPC', {
