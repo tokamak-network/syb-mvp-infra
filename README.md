@@ -21,13 +21,17 @@ ssh -i /path/to/your-key-pair.pem -L 5432:<rds-endpoint>:5432 ec2-user@<bastion-
 
 Configure your DBMS tool to connect to `localhost:5432` to access the RDS.
 
-## Create Stacks
+## Deploy Stacks
 
 - Bootstrap CDK to prepare the repo for stack creation (only one time per account & region):
 
 ```bash
 cdk bootstrap
 ```
+
+- `cdk list` will give the list of stacks defined in the app
+- `cdk synth <StackName>` will synthesize specified stack from CDK to Cloudformation template files.
+- `cdk deploy <StackName>` deploys the specified stack
 
 ## Useful commands
 

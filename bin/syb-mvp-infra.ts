@@ -1,9 +1,7 @@
 #!/usr/bin/env node
 import * as cdk from 'aws-cdk-lib'
-import { CommonResourcesStack } from '../lib/common-resources-stack'
-import { RdsStack } from '../lib/rds-stack'
-import { EcsStack } from '../lib/ecs-stack'
 import * as dotenv from 'dotenv'
+import { SybMvpStack } from '../lib/syb-mvp-stack'
 
 dotenv.config()
 
@@ -40,77 +38,26 @@ if (!CIRCUIT_MAIN_DOMAIN || !CIRCUIT_MAIN_PORT) {
 
 const app = new cdk.App()
 
-const commonResourcesStack = new CommonResourcesStack(
-  app,
-  'CommonResourcesStack',
-  {
-    cidrBlock: CIDR_BLOCK,
-    slackWebhookUrl: SLACK_WEBHOOK_URL,
-    route53DomainName: ROUTE53_DOMAIN_NAME,
-    monthlyBudgetLimit: 300
-  }
-)
-
-new RdsStack(app, 'SequencerMainRdsStack', {
-  vpc: commonResourcesStack.vpc,
+new SybMvpStack(app, 'SybMvpMainStack', {
   cidrBlock: CIDR_BLOCK,
-  rdsSecurityGroup: commonResourcesStack.rdsSecurityGroup
-})
-
-new EcsStack(app, 'SequencerMainEcsStack', {
-  cidrBlock: CIDR_BLOCK,
-  serverPort: parseInt(SEQUENCER_MAIN_PORT),
-  domainName: SEQUENCER_MAIN_DOMAIN,
   slackWebhookUrl: SLACK_WEBHOOK_URL,
-  vpc: commonResourcesStack.vpc,
-  slackNotifier: commonResourcesStack.slackNotifier,
-  ecrRepo: commonResourcesStack.mainEcrRepo,
-  route53: commonResourcesStack.route53,
-  service: 'sequencer',
-  deploymentEnv: 'main'
+  route53DomainName: ROUTE53_DOMAIN_NAME,
+  monthlyBudgetLimit: 300,
+  deploymentEnv: 'main',
+  sequencerDomain: SEQUENCER_MAIN_DOMAIN,
+  sequencerPort: parseInt(SEQUENCER_MAIN_PORT),
+  circuitDomain: CIRCUIT_MAIN_DOMAIN,
+  circuitPort: parseInt(CIRCUIT_MAIN_PORT)
 })
 
-new RdsStack(app, 'SequencerTestRdsStack', {
-  vpc: commonResourcesStack.vpc,
+new SybMvpStack(app, 'SybMvpTestStack', {
   cidrBlock: CIDR_BLOCK,
-  rdsSecurityGroup: commonResourcesStack.rdsSecurityGroup
-})
-
-new EcsStack(app, 'SequencerTestEcsStack', {
-  cidrBlock: CIDR_BLOCK,
-  serverPort: parseInt(SEQUENCER_TEST_PORT),
-  domainName: SEQUENCER_TEST_DOMAIN,
   slackWebhookUrl: SLACK_WEBHOOK_URL,
-  vpc: commonResourcesStack.vpc,
-  slackNotifier: commonResourcesStack.slackNotifier,
-  ecrRepo: commonResourcesStack.testEcrRepo,
-  route53: commonResourcesStack.route53,
-  service: 'sequencer',
-  deploymentEnv: 'test'
-})
-
-new EcsStack(app, 'CircuitMainEcsStack', {
-  cidrBlock: CIDR_BLOCK,
-  serverPort: parseInt(CIRCUIT_MAIN_PORT),
-  domainName: CIRCUIT_MAIN_DOMAIN,
-  slackWebhookUrl: SLACK_WEBHOOK_URL,
-  vpc: commonResourcesStack.vpc,
-  slackNotifier: commonResourcesStack.slackNotifier,
-  ecrRepo: commonResourcesStack.mainEcrRepo,
-  route53: commonResourcesStack.route53,
-  service: 'circuit',
-  deploymentEnv: 'main'
-})
-
-new EcsStack(app, 'CircuitTestEcsStack', {
-  cidrBlock: CIDR_BLOCK,
-  serverPort: parseInt(CIRCUIT_TEST_PORT),
-  domainName: CIRCUIT_TEST_DOMAIN,
-  slackWebhookUrl: SLACK_WEBHOOK_URL,
-  vpc: commonResourcesStack.vpc,
-  slackNotifier: commonResourcesStack.slackNotifier,
-  ecrRepo: commonResourcesStack.testEcrRepo,
-  route53: commonResourcesStack.route53,
-  service: 'circuit',
-  deploymentEnv: 'test'
+  route53DomainName: ROUTE53_DOMAIN_NAME,
+  monthlyBudgetLimit: 300,
+  deploymentEnv: 'test',
+  sequencerDomain: SEQUENCER_TEST_DOMAIN,
+  sequencerPort: parseInt(SEQUENCER_TEST_PORT),
+  circuitDomain: CIRCUIT_TEST_DOMAIN,
+  circuitPort: parseInt(CIRCUIT_TEST_PORT)
 })

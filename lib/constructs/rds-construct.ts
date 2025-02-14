@@ -3,17 +3,17 @@ import { Construct } from 'constructs'
 import * as ec2 from 'aws-cdk-lib/aws-ec2'
 import * as rds from 'aws-cdk-lib/aws-rds'
 
-interface RdsStackProps extends cdk.StackProps {
+interface RdsConstructProps extends cdk.StackProps {
   vpc: ec2.Vpc
   cidrBlock: string
   rdsSecurityGroup: ec2.SecurityGroup
 }
 
-export class RdsStack extends cdk.Stack {
-  constructor(scope: Construct, id: string, props: RdsStackProps) {
-    super(scope, id, props)
+export class RdsConstruct extends Construct {
+  constructor(scope: Construct, id: string, props: RdsConstructProps) {
+    super(scope, id)
 
-    const dbInstance = new rds.DatabaseInstance(this, 'Database', {
+    new rds.DatabaseInstance(this, 'Database', {
       engine: rds.DatabaseInstanceEngine.postgres({
         version: rds.PostgresEngineVersion.VER_17
       }),
