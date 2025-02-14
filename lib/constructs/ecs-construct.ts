@@ -14,9 +14,7 @@ import * as autoscaling from 'aws-cdk-lib/aws-autoscaling'
 import * as iam from 'aws-cdk-lib/aws-iam'
 import * as codedeploy from 'aws-cdk-lib/aws-codedeploy'
 import * as elbv2 from 'aws-cdk-lib/aws-elasticloadbalancingv2'
-
-export type Service = 'sequencer' | 'client' | 'circuit'
-export type Env = 'main' | 'test'
+import { Env, Service } from '../types'
 
 interface EcsConstructProps extends cdk.StackProps {
   vpc: ec2.Vpc
