@@ -70,10 +70,7 @@ export class SybMvpStack extends cdk.Stack {
       machineImage: ec2.MachineImage.latestAmazonLinux2(),
       vpcSubnets: {
         subnetType: ec2.SubnetType.PUBLIC
-      },
-      keyPair: ec2.KeyPair.fromKeyPairAttributes(this, 'KeyPair', {
-        keyPairName: 'bastion-key-name'
-      }) // TODO: To be replaced with actual key name
+      }
     })
 
     this.bastion.connections.allowFrom(

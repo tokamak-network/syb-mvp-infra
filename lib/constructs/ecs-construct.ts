@@ -37,6 +37,18 @@ export class EcsConstruct extends Construct {
       vpc: props.vpc
     })
 
+    const ecsInstanceRole = new iam.Role(this, 'EcsInstanceRole', {
+      assumedBy: new iam.ServicePrincipal('ec2.amazonaws.com')
+    })
+    ecsInstanceRole.addManagedPolicy(
+      iam.ManagedPolicy.fromAwsManagedPolicyName('AmazonSSMManagedInstanceCore')
+    )
+    ecsInstanceRole.addManagedPolicy(
+      iam.ManagedPolicy.fromAwsManagedPolicyName(
+        'AmazonEC2ContainerServiceforEC2Role'
+      )
+    )
+
     const autoScalingGroup = new ecs.AsgCapacityProvider(
       this,
       'AsgCapacityProvider',
@@ -49,6 +61,7 @@ export class EcsConstruct extends Construct {
             instanceType: new ec2.InstanceType('t2.micro'),
             machineImage: ecs.EcsOptimizedImage.amazonLinux2(),
             minCapacity: 1,
+            role: ecsInstanceRole,
 
             // An EBS volume can only be used by a single instance at a time
             // This is why we set maxCapacity to 1 for the sequencer service
