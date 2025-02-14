@@ -16,6 +16,10 @@ interface SybMvpStackProps extends cdk.StackProps {
   route53DomainName: string
   monthlyBudgetLimit: number
   deploymentEnv: 'main' | 'test'
+  sequencerDomain: string
+  sequencerPort: number
+  circuitDomain: string
+  circuitPort: number
 }
 
 export class SybMvpStack extends cdk.Stack {
@@ -177,8 +181,8 @@ export class SybMvpStack extends cdk.Stack {
       cidrBlock: props.cidrBlock,
       service: 'sequencer',
       deploymentEnv: props.deploymentEnv,
-      serverPort: 5000, // TODO: hardcoded
-      domainName: 'sequencer' // TODO: hardcoded
+      serverPort: props.sequencerPort,
+      domainName: props.sequencerDomain
     })
 
     // sequencer RDS resources
@@ -198,8 +202,8 @@ export class SybMvpStack extends cdk.Stack {
       cidrBlock: props.cidrBlock,
       service: 'circuit',
       deploymentEnv: props.deploymentEnv,
-      serverPort: 5000, // TODO: hardcoded
-      domainName: 'circuit' // TODO: hardcoded
+      serverPort: props.circuitPort,
+      domainName: props.circuitDomain
     })
   }
 }

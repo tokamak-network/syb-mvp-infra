@@ -43,7 +43,11 @@ new SybMvpStack(app, 'SybMainStack', {
   slackWebhookUrl: SLACK_WEBHOOK_URL,
   route53DomainName: ROUTE53_DOMAIN_NAME,
   monthlyBudgetLimit: 300,
-  deploymentEnv: 'main'
+  deploymentEnv: 'main',
+  sequencerDomain: SEQUENCER_MAIN_DOMAIN,
+  sequencerPort: parseInt(SEQUENCER_MAIN_PORT),
+  circuitDomain: CIRCUIT_MAIN_DOMAIN,
+  circuitPort: parseInt(CIRCUIT_MAIN_PORT)
 })
 
 new SybMvpStack(app, 'SybTestStack', {
@@ -51,5 +55,9 @@ new SybMvpStack(app, 'SybTestStack', {
   slackWebhookUrl: SLACK_WEBHOOK_URL,
   route53DomainName: ROUTE53_DOMAIN_NAME,
   monthlyBudgetLimit: 300,
-  deploymentEnv: 'test'
+  deploymentEnv: 'test',
+  sequencerDomain: SEQUENCER_TEST_DOMAIN,
+  sequencerPort: parseInt(SEQUENCER_TEST_PORT),
+  circuitDomain: CIRCUIT_TEST_DOMAIN,
+  circuitPort: parseInt(CIRCUIT_TEST_PORT)
 })
