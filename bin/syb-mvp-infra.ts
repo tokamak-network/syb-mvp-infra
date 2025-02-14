@@ -38,7 +38,7 @@ if (!CIRCUIT_MAIN_DOMAIN || !CIRCUIT_MAIN_PORT) {
 
 const app = new cdk.App()
 
-new SybMvpStack(app, 'SybMainStack', {
+new SybMvpStack(app, 'SybMvpMainStack', {
   cidrBlock: CIDR_BLOCK,
   slackWebhookUrl: SLACK_WEBHOOK_URL,
   route53DomainName: ROUTE53_DOMAIN_NAME,
@@ -50,7 +50,7 @@ new SybMvpStack(app, 'SybMainStack', {
   circuitPort: parseInt(CIRCUIT_MAIN_PORT)
 })
 
-new SybMvpStack(app, 'SybTestStack', {
+new SybMvpStack(app, 'SybMvpTestStack', {
   cidrBlock: CIDR_BLOCK,
   slackWebhookUrl: SLACK_WEBHOOK_URL,
   route53DomainName: ROUTE53_DOMAIN_NAME,
