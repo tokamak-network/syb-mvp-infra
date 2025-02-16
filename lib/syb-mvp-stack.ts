@@ -31,7 +31,7 @@ export class SybMvpStack extends cdk.Stack {
   public readonly rdsSecurityGroup: ec2.SecurityGroup
   public readonly bastion: ec2.Instance
   public readonly slackNotifier: lambda.Function
-  public readonly ecrRepo: ecr.Repository
+  public readonly ecrRepo: ecr.IRepository
   public readonly route53: route53.IHostedZone
 
   constructor(scope: Construct, id: string, props: SybMvpStackProps) {
@@ -100,9 +100,11 @@ export class SybMvpStack extends cdk.Stack {
       }
     })
 
-    this.ecrRepo = new ecr.Repository(this, 'EcrRepo', {
-      repositoryName: `${props.deploymentEnv}-ecr-repo`
-    })
+    this.ecrRepo = ecr.Repository.fromRepositoryName(
+      this,
+      'EcrRepo',
+      `${props.deploymentEnv}-ecr-repo`
+    )
 
     this.route53 = new route53.HostedZone(this, 'HostedZone', {
       zoneName: props.route53DomainName,

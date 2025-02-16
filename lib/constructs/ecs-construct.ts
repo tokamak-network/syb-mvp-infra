@@ -23,7 +23,7 @@ interface EcsConstructProps extends cdk.StackProps {
   domainName: string
   slackWebhookUrl: string
   slackNotifier: lambda.Function
-  ecrRepo: ecr.Repository
+  ecrRepo: ecr.IRepository
   route53: route53.IHostedZone
   service: Service
   deploymentEnv: Env
