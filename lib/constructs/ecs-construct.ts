@@ -92,7 +92,16 @@ export class EcsConstruct extends Construct {
       image: ecs.ContainerImage.fromEcrRepository(props.ecrRepo),
       memoryLimitMiB: 512,
       cpu: 256,
-      logging: ecs.LogDrivers.awsLogs({ streamPrefix: 'ecs' })
+      logging: ecs.LogDrivers.awsLogs({ streamPrefix: 'ecs' }),
+      healthCheck: {
+        command: [
+          'CMD-SHELL',
+          `curl -f http://localhost:${props.serverPort}/health || exit 1`
+        ],
+        interval: cdk.Duration.seconds(30),
+        timeout: cdk.Duration.seconds(5),
+        retries: 3
+      }
     })
 
     container.addPortMappings({
