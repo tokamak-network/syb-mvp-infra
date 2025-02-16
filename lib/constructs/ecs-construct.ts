@@ -45,24 +45,24 @@ export class EcsConstruct extends Construct {
     )
 
     // TODO: having these endpoints results in a sort of 'already exists' error
-    props.vpc.addInterfaceEndpoint(
-      `SSM-${props.service}-${props.deploymentEnv}`,
-      {
-        service: ec2.InterfaceVpcEndpointAwsService.SSM
-      }
-    )
-    props.vpc.addInterfaceEndpoint(
-      `SSMMessages-${props.service}-${props.deploymentEnv}`,
-      {
-        service: ec2.InterfaceVpcEndpointAwsService.SSM_MESSAGES
-      }
-    )
-    props.vpc.addInterfaceEndpoint(
-      `EC2Messages-${props.service}-${props.deploymentEnv}`,
-      {
-        service: ec2.InterfaceVpcEndpointAwsService.EC2_MESSAGES
-      }
-    )
+    // props.vpc.addInterfaceEndpoint(
+    //   `SSM-${props.service}-${props.deploymentEnv}`,
+    //   {
+    //     service: ec2.InterfaceVpcEndpointAwsService.SSM
+    //   }
+    // )
+    // props.vpc.addInterfaceEndpoint(
+    //   `SSMMessages-${props.service}-${props.deploymentEnv}`,
+    //   {
+    //     service: ec2.InterfaceVpcEndpointAwsService.SSM_MESSAGES
+    //   }
+    // )
+    // props.vpc.addInterfaceEndpoint(
+    //   `EC2Messages-${props.service}-${props.deploymentEnv}`,
+    //   {
+    //     service: ec2.InterfaceVpcEndpointAwsService.EC2_MESSAGES
+    //   }
+    // )
 
     const autoScalingGroup = new ecs.AsgCapacityProvider(
       this,

@@ -170,7 +170,7 @@ export class SybMvpStack extends cdk.Stack {
     })
 
     // sequencer ECS resources
-    new EcsConstruct(this, 'EcsConstruct', {
+    new EcsConstruct(this, 'SequencerEcsConstruct', {
       vpc: this.vpc,
       slackNotifier: this.slackNotifier,
       ecrRepo: this.ecrRepo,

@@ -17,10 +17,10 @@ export class RdsConstruct extends Construct {
 
     new rds.DatabaseInstance(this, 'Database', {
       engine: rds.DatabaseInstanceEngine.postgres({
-        version: rds.PostgresEngineVersion.VER_17
+        version: rds.PostgresEngineVersion.VER_16_3
       }),
       instanceType: ec2.InstanceType.of(
-        ec2.InstanceClass.BURSTABLE2,
+        ec2.InstanceClass.BURSTABLE3,
         ec2.InstanceSize.MICRO
       ),
       vpc: props.vpc,
