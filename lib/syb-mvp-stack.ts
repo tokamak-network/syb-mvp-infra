@@ -37,6 +37,7 @@ export class SybMvpStack extends cdk.Stack {
   constructor(scope: Construct, id: string, props: SybMvpStackProps) {
     super(scope, id, props)
 
+    // TODO: public subnets are being assigned an EIP, investigate if necessary
     this.vpc = new ec2.Vpc(this, 'ProdVPC', {
       ipAddresses: ec2.IpAddresses.cidr(props.cidrBlock),
       maxAzs: 2,
@@ -110,9 +111,11 @@ export class SybMvpStack extends cdk.Stack {
       zoneName: props.route53DomainName,
       vpcs: [this.vpc]
     })
-    new cdk.CfnOutput(this, 'NameServers', {
-      value: cdk.Fn.join(', ', this.route53.hostedZoneNameServers || [])
-    })
+
+    // TODO: investigate if necessary
+    // new cdk.CfnOutput(this, 'NameServers', {
+    //   value: cdk.Fn.join(', ', this.route53.hostedZoneNameServers || [])
+    // })
 
     const budgetNotificationTopic = new sns.Topic(
       this,
