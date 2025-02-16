@@ -1,0 +1,43 @@
+name: SYB MVP Test App Build
+
+on:
+  workflow_dispatch:
+
+jobs:
+  test_app_build:
+    name: Test App Build
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: ${{ env.AWS_REGION }}
+
+      - name: Login to Amazon ECR
+        id: login-ecr
+        uses: aws-actions/amazon-ecr-login@v2
+        with:
+          mask-password: 'true'
+
+      - name: Build, tag, and push image to Amazon ECR
+        id: build-image
+        env:
+          ECR_REGISTRY: ${{ steps.login-ecr.outputs.registry }}
+          ECR_REPOSITORY: test-ecr-repo
+          SEQUENCER_IMAGE_TAG: sequencer-${{ github.sha }}
+          CIRCUIT_IMAGE_TAG: circuit-${{ github.sha }}
+        run: |
+          docker build --build-arg PORT=5000 SERVICE=sequencer -t $ECR_REGISTRY/$ECR_REPOSITORY:$SEQUENCER_IMAGE_TAG -f test/app/Dockerfile test/app
+          docker build --build-arg PORT=5000 SERVICE=circuit -t $ECR_REGISTRY/$ECR_REPOSITORY:$CIRCUIT_IMAGE_TAG -f test/app/Dockerfile test/app
+
+          docker push $ECR_REGISTRY/$ECR_REPOSITORY:$SEQUENCER_IMAGE_TAG
+          docker push $ECR_REGISTRY/$ECR_REPOSITORY:$CIRCUIT_IMAGE_TAG
+
+          echo "image=$ECR_REGISTRY/$ECR_REPOSITORY:$SEQUENCER_IMAGE_TAG" >> $GITHUB_STATE
+          echo "image=$ECR_REGISTRY/$ECR_REPOSITORY:$CIRCUIT_IMAGE_TAG" >> $GITHUB_STATE
