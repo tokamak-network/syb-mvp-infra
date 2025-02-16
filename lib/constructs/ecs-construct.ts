@@ -28,6 +28,7 @@ interface EcsConstructProps extends cdk.StackProps {
   service: Service
   deploymentEnv: Env
   cluster: ecs.Cluster
+  initialImageTag: string
 }
 
 export class EcsConstruct extends Construct {
@@ -89,7 +90,10 @@ export class EcsConstruct extends Construct {
     const taskDefinition = new ecs.Ec2TaskDefinition(this, 'TaskDef')
 
     const container = taskDefinition.addContainer('AppContainer', {
-      image: ecs.ContainerImage.fromEcrRepository(props.ecrRepo),
+      image: ecs.ContainerImage.fromEcrRepository(
+        props.ecrRepo,
+        props.initialImageTag
+      ),
       memoryLimitMiB: 512,
       cpu: 256,
       logging: ecs.LogDrivers.awsLogs({ streamPrefix: 'ecs' }),

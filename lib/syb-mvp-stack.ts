@@ -22,6 +22,8 @@ interface SybMvpStackProps extends cdk.StackProps {
   sequencerPort: number
   circuitDomain: string
   circuitPort: number
+  sequencerInitialImageTag: string
+  circuitInitialImageTag: string
 }
 
 export class SybMvpStack extends cdk.Stack {
@@ -186,7 +188,8 @@ export class SybMvpStack extends cdk.Stack {
       deploymentEnv: props.deploymentEnv,
       serverPort: props.sequencerPort,
       domainName: props.sequencerDomain,
-      cluster
+      cluster,
+      initialImageTag: props.sequencerInitialImageTag
     })
 
     // sequencer RDS resources
@@ -209,7 +212,8 @@ export class SybMvpStack extends cdk.Stack {
       deploymentEnv: props.deploymentEnv,
       serverPort: props.circuitPort,
       domainName: props.circuitDomain,
-      cluster
+      cluster,
+      initialImageTag: props.circuitInitialImageTag
     })
 
     cdk.Aspects.of(this).add(new RemovalPolicyAspect())
