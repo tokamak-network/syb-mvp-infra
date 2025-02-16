@@ -33,8 +33,8 @@ jobs:
           SEQUENCER_IMAGE_TAG: sequencer-${{ github.sha }}
           CIRCUIT_IMAGE_TAG: circuit-${{ github.sha }}
         run: |
-          docker build --build-arg PORT=5000 SERVICE=sequencer -t $ECR_REGISTRY/$ECR_REPOSITORY:$SEQUENCER_IMAGE_TAG -f test/app/Dockerfile test/app
-          docker build --build-arg PORT=5000 SERVICE=circuit -t $ECR_REGISTRY/$ECR_REPOSITORY:$CIRCUIT_IMAGE_TAG -f test/app/Dockerfile test/app
+          docker build --build-arg PORT=5000 --build-arg SERVICE=sequencer -t $ECR_REGISTRY/$ECR_REPOSITORY:$SEQUENCER_IMAGE_TAG -f test/app/Dockerfile test/app
+          docker build --build-arg PORT=5000 --build-arg SERVICE=circuit -t $ECR_REGISTRY/$ECR_REPOSITORY:$CIRCUIT_IMAGE_TAG -f test/app/Dockerfile test/app
 
           docker push $ECR_REGISTRY/$ECR_REPOSITORY:$SEQUENCER_IMAGE_TAG
           docker push $ECR_REGISTRY/$ECR_REPOSITORY:$CIRCUIT_IMAGE_TAG
