@@ -9,6 +9,7 @@ import * as sns from 'aws-cdk-lib/aws-sns'
 import * as sns_subscriptions from 'aws-cdk-lib/aws-sns-subscriptions'
 import { EcsConstruct } from './constructs/ecs-construct'
 import { RdsConstruct } from './constructs/rds-construct'
+import { RemovalPolicyAspect } from './aspects/removal-policy-aspect'
 
 interface SybMvpStackProps extends cdk.StackProps {
   cidrBlock: string
@@ -35,7 +36,7 @@ export class SybMvpStack extends cdk.Stack {
 
     this.vpc = new ec2.Vpc(this, 'ProdVPC', {
       ipAddresses: ec2.IpAddresses.cidr(props.cidrBlock),
-      maxAzs: 1,
+      maxAzs: 2,
       subnetConfiguration: [
         {
           cidrMask: 24,
@@ -97,7 +98,7 @@ export class SybMvpStack extends cdk.Stack {
     })
 
     this.ecrRepo = new ecr.Repository(this, 'EcrRepo', {
-      repositoryName: 'main-ecr-repo'
+      repositoryName: `${props.deploymentEnv}-ecr-repo`
     })
 
     this.route53 = new route53.HostedZone(this, 'HostedZone', {
@@ -186,7 +187,8 @@ export class SybMvpStack extends cdk.Stack {
     new RdsConstruct(this, 'RdsConstruct', {
       vpc: this.vpc,
       cidrBlock: props.cidrBlock,
-      rdsSecurityGroup: this.rdsSecurityGroup
+      rdsSecurityGroup: this.rdsSecurityGroup,
+      deploymentEnv: props.deploymentEnv
     })
 
     // circuit ECS resources
@@ -202,5 +204,7 @@ export class SybMvpStack extends cdk.Stack {
       serverPort: props.circuitPort,
       domainName: props.circuitDomain
     })
+
+    cdk.Aspects.of(this).add(new RemovalPolicyAspect())
   }
 }

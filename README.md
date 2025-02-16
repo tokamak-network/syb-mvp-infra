@@ -32,12 +32,5 @@ cdk bootstrap
 - `cdk list` will give the list of stacks defined in the app
 - `cdk synth <StackName>` will synthesize specified stack from CDK to Cloudformation template files.
 - `cdk deploy <StackName>` deploys the specified stack
-
-## Useful commands
-
-- `yarn build` compile typescript to js
-- `yarn watch` watch for changes and compile
-- `yarn test` perform the jest unit tests
-- `npx cdk deploy` deploy this stack to your default AWS account/region
-- `npx cdk diff` compare deployed stack with current state
-- `npx cdk synth` emits the synthesized CloudFormation template
+- `cdk diff <StackName>` compare deployed stack with current state
+- `cdk destroy <StackName>` delete specified stack

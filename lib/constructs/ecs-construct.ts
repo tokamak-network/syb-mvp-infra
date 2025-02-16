@@ -43,10 +43,25 @@ export class EcsConstruct extends Construct {
     ecsInstanceRole.addManagedPolicy(
       iam.ManagedPolicy.fromAwsManagedPolicyName('AmazonSSMManagedInstanceCore')
     )
-    ecsInstanceRole.addManagedPolicy(
-      iam.ManagedPolicy.fromAwsManagedPolicyName(
-        'AmazonEC2ContainerServiceforEC2Role'
-      )
+
+    // TODO: having these endpoints results in a sort of 'already exists' error
+    props.vpc.addInterfaceEndpoint(
+      `SSM-${props.service}-${props.deploymentEnv}`,
+      {
+        service: ec2.InterfaceVpcEndpointAwsService.SSM
+      }
+    )
+    props.vpc.addInterfaceEndpoint(
+      `SSMMessages-${props.service}-${props.deploymentEnv}`,
+      {
+        service: ec2.InterfaceVpcEndpointAwsService.SSM_MESSAGES
+      }
+    )
+    props.vpc.addInterfaceEndpoint(
+      `EC2Messages-${props.service}-${props.deploymentEnv}`,
+      {
+        service: ec2.InterfaceVpcEndpointAwsService.EC2_MESSAGES
+      }
     )
 
     const autoScalingGroup = new ecs.AsgCapacityProvider(
@@ -175,25 +190,6 @@ export class EcsConstruct extends Construct {
 
     cpuAlarm.addAlarmAction(new cloudwatch_actions.SnsAction(topic))
     memoryAlarm.addAlarmAction(new cloudwatch_actions.SnsAction(topic))
-
-    props.vpc.addInterfaceEndpoint(
-      `SSM-${props.service}-${props.deploymentEnv}`,
-      {
-        service: ec2.InterfaceVpcEndpointAwsService.SSM
-      }
-    )
-    props.vpc.addInterfaceEndpoint(
-      `SSMMessages-${props.service}-${props.deploymentEnv}`,
-      {
-        service: ec2.InterfaceVpcEndpointAwsService.SSM_MESSAGES
-      }
-    )
-    props.vpc.addInterfaceEndpoint(
-      `EC2Messages-${props.service}-${props.deploymentEnv}`,
-      {
-        service: ec2.InterfaceVpcEndpointAwsService.EC2_MESSAGES
-      }
-    )
 
     const ecsSecurityGroup = new ec2.SecurityGroup(this, 'EcsSecurityGroup', {
       vpc: props.vpc,

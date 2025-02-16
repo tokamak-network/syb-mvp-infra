@@ -2,11 +2,13 @@ import * as cdk from 'aws-cdk-lib'
 import { Construct } from 'constructs'
 import * as ec2 from 'aws-cdk-lib/aws-ec2'
 import * as rds from 'aws-cdk-lib/aws-rds'
+import { Env } from '../types'
 
 interface RdsConstructProps extends cdk.StackProps {
   vpc: ec2.Vpc
   cidrBlock: string
   rdsSecurityGroup: ec2.SecurityGroup
+  deploymentEnv: Env
 }
 
 export class RdsConstruct extends Construct {
@@ -29,7 +31,7 @@ export class RdsConstruct extends Construct {
         subnetType: ec2.SubnetType.PRIVATE_WITH_EGRESS
       },
       securityGroups: [props.rdsSecurityGroup],
-      deletionProtection: true
+      deletionProtection: props.deploymentEnv === 'main' ? true : false
     })
   }
 }
