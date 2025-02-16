@@ -27,15 +27,12 @@ interface EcsConstructProps extends cdk.StackProps {
   route53: route53.IHostedZone
   service: Service
   deploymentEnv: Env
+  cluster: ecs.Cluster
 }
 
 export class EcsConstruct extends Construct {
   constructor(scope: Construct, id: string, props: EcsConstructProps) {
     super(scope, id)
-
-    const cluster = new ecs.Cluster(this, 'EcsCluster', {
-      vpc: props.vpc
-    })
 
     const ecsInstanceRole = new iam.Role(this, 'EcsInstanceRole', {
       assumedBy: new iam.ServicePrincipal('ec2.amazonaws.com')
@@ -87,7 +84,7 @@ export class EcsConstruct extends Construct {
       }
     )
 
-    cluster.addAsgCapacityProvider(autoScalingGroup)
+    props.cluster.addAsgCapacityProvider(autoScalingGroup)
 
     const taskDefinition = new ecs.Ec2TaskDefinition(this, 'TaskDef')
 
@@ -103,7 +100,7 @@ export class EcsConstruct extends Construct {
     })
 
     const service = new ecs.Ec2Service(this, 'Ec2Service', {
-      cluster,
+      cluster: props.cluster,
       taskDefinition,
       deploymentController: {
         type: ecs.DeploymentControllerType.CODE_DEPLOY

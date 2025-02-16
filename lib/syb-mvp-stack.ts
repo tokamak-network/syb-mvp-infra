@@ -6,6 +6,7 @@ import * as ecr from 'aws-cdk-lib/aws-ecr'
 import * as route53 from 'aws-cdk-lib/aws-route53'
 import * as budgets from 'aws-cdk-lib/aws-budgets'
 import * as sns from 'aws-cdk-lib/aws-sns'
+import * as ecs from 'aws-cdk-lib/aws-ecs'
 import * as sns_subscriptions from 'aws-cdk-lib/aws-sns-subscriptions'
 import { EcsConstruct } from './constructs/ecs-construct'
 import { RdsConstruct } from './constructs/rds-construct'
@@ -169,6 +170,10 @@ export class SybMvpStack extends cdk.Stack {
       ]
     })
 
+    const cluster = new ecs.Cluster(this, 'EcsCluster', {
+      vpc: this.vpc
+    })
+
     // sequencer ECS resources
     new EcsConstruct(this, 'SequencerEcsConstruct', {
       vpc: this.vpc,
@@ -180,7 +185,8 @@ export class SybMvpStack extends cdk.Stack {
       service: 'sequencer',
       deploymentEnv: props.deploymentEnv,
       serverPort: props.sequencerPort,
-      domainName: props.sequencerDomain
+      domainName: props.sequencerDomain,
+      cluster
     })
 
     // sequencer RDS resources
@@ -202,7 +208,8 @@ export class SybMvpStack extends cdk.Stack {
       service: 'circuit',
       deploymentEnv: props.deploymentEnv,
       serverPort: props.circuitPort,
-      domainName: props.circuitDomain
+      domainName: props.circuitDomain,
+      cluster
     })
 
     cdk.Aspects.of(this).add(new RemovalPolicyAspect())
