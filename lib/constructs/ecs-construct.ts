@@ -42,26 +42,6 @@ export class EcsConstruct extends Construct {
       iam.ManagedPolicy.fromAwsManagedPolicyName('AmazonSSMManagedInstanceCore')
     )
 
-    // TODO: having these endpoints results in a sort of 'already exists' error
-    // props.vpc.addInterfaceEndpoint(
-    //   `SSM-${props.service}-${props.deploymentEnv}`,
-    //   {
-    //     service: ec2.InterfaceVpcEndpointAwsService.SSM
-    //   }
-    // )
-    // props.vpc.addInterfaceEndpoint(
-    //   `SSMMessages-${props.service}-${props.deploymentEnv}`,
-    //   {
-    //     service: ec2.InterfaceVpcEndpointAwsService.SSM_MESSAGES
-    //   }
-    // )
-    // props.vpc.addInterfaceEndpoint(
-    //   `EC2Messages-${props.service}-${props.deploymentEnv}`,
-    //   {
-    //     service: ec2.InterfaceVpcEndpointAwsService.EC2_MESSAGES
-    //   }
-    // )
-
     const autoScalingGroup = new ecs.AsgCapacityProvider(
       this,
       'AsgCapacityProvider',
@@ -71,7 +51,7 @@ export class EcsConstruct extends Construct {
           'DefaultAutoScalingGroup',
           {
             vpc: props.vpc,
-            instanceType: new ec2.InstanceType('t2.micro'),
+            instanceType: new ec2.InstanceType('t3.medium'),
             machineImage: ecs.EcsOptimizedImage.amazonLinux2(),
             minCapacity: 1,
             role: ecsInstanceRole,
@@ -94,8 +74,8 @@ export class EcsConstruct extends Construct {
         props.ecrRepo,
         props.initialImageTag
       ),
-      memoryLimitMiB: 512,
-      cpu: 256,
+      memoryLimitMiB: 1024,
+      cpu: 512,
       logging: ecs.LogDrivers.awsLogs({ streamPrefix: 'ecs' }),
       healthCheck: {
         command: [
