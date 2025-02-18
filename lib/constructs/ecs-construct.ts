@@ -89,7 +89,9 @@ export class EcsConstruct extends Construct {
     })
 
     container.addPortMappings({
-      containerPort: props.serverPort
+      containerPort: props.serverPort,
+      // TODO: experimental, for some reason requests are not reaching the container
+      hostPort: props.serverPort
     })
 
     const service = new ecs.Ec2Service(this, 'Ec2Service', {
@@ -113,7 +115,14 @@ export class EcsConstruct extends Construct {
     const blueTargetGroup = listener.addTargets('BlueTargetGroup', {
       port: props.serverPort,
       targets: [service],
-      protocol: elbv2.ApplicationProtocol.HTTP
+      protocol: elbv2.ApplicationProtocol.HTTP,
+      healthCheck: {
+        path: '/health',
+        interval: cdk.Duration.seconds(30),
+        timeout: cdk.Duration.seconds(3),
+        healthyThresholdCount: 2,
+        unhealthyThresholdCount: 2
+      }
     })
 
     const greenTargetGroup = new elbv2.ApplicationTargetGroup(
