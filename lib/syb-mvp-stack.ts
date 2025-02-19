@@ -194,7 +194,9 @@ export class SybMvpStack extends cdk.Stack {
       serverPort: props.sequencerPort,
       domainName: props.sequencerDomain,
       cluster,
-      initialImageTag: props.sequencerInitialImageTag
+      initialImageTag: props.sequencerInitialImageTag,
+      maxEc2ScalingCapacity: 1,
+      maxTaskScalingCapacity: 1
     })
 
     // sequencer RDS resources
@@ -206,6 +208,8 @@ export class SybMvpStack extends cdk.Stack {
     })
 
     // circuit ECS resources
+    // TODO: circuit needs to be serverless as it runs only at certain times and is expensive to run
+    // update EcsConstruct to support serverless
     new EcsConstruct(this, 'CircuitEcsConstruct', {
       vpc: this.vpc,
       slackNotifier: this.slackNotifier,
@@ -218,7 +222,9 @@ export class SybMvpStack extends cdk.Stack {
       serverPort: props.circuitPort,
       domainName: props.circuitDomain,
       cluster,
-      initialImageTag: props.circuitInitialImageTag
+      initialImageTag: props.circuitInitialImageTag,
+      maxEc2ScalingCapacity: 1,
+      maxTaskScalingCapacity: 1
     })
 
     cdk.Aspects.of(this).add(new RemovalPolicyAspect())

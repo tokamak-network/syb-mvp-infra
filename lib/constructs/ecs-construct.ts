@@ -29,6 +29,8 @@ interface EcsConstructProps extends cdk.StackProps {
   deploymentEnv: Env
   cluster: ecs.Cluster
   initialImageTag: string
+  maxEc2ScalingCapacity: number
+  maxTaskScalingCapacity: number
 }
 
 export class EcsConstruct extends Construct {
@@ -59,7 +61,7 @@ export class EcsConstruct extends Construct {
             // An EBS volume can only be used by a single instance at a time
             // This is why we set maxCapacity to 1 for the sequencer service
             // Need to figure out a better way to handle this
-            maxCapacity: props.service === 'sequencer' ? 1 : 5
+            maxCapacity: props.maxEc2ScalingCapacity
           }
         )
       }
@@ -151,7 +153,9 @@ export class EcsConstruct extends Construct {
       deploymentConfig: codedeploy.EcsDeploymentConfig.CANARY_10PERCENT_5MINUTES
     })
 
-    const scaling = service.autoScaleTaskCount({ maxCapacity: 5 })
+    const scaling = service.autoScaleTaskCount({
+      maxCapacity: props.maxTaskScalingCapacity
+    })
     scaling.scaleOnCpuUtilization('CpuScaling', {
       targetUtilizationPercent: 90
     })
@@ -190,6 +194,7 @@ export class EcsConstruct extends Construct {
     cpuAlarm.addAlarmAction(new cloudwatch_actions.SnsAction(topic))
     memoryAlarm.addAlarmAction(new cloudwatch_actions.SnsAction(topic))
 
+    // TODO: for some reason EC2 instances don't have inbound SG rules attached
     const ecsSecurityGroup = new ec2.SecurityGroup(this, 'EcsSecurityGroup', {
       vpc: props.vpc,
       allowAllOutbound: true
@@ -198,6 +203,10 @@ export class EcsConstruct extends Construct {
       ec2.Peer.ipv4(props.cidrBlock),
       ec2.Port.tcp(props.serverPort),
       'Allow traffic to server port'
+    )
+    ecsSecurityGroup.connections.allowFrom(
+      loadBalancer,
+      ec2.Port.tcp(props.serverPort)
     )
     service.connections.addSecurityGroup(ecsSecurityGroup)
 
