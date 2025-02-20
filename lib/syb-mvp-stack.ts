@@ -6,9 +6,11 @@ import * as ecr from 'aws-cdk-lib/aws-ecr'
 import * as route53 from 'aws-cdk-lib/aws-route53'
 import * as budgets from 'aws-cdk-lib/aws-budgets'
 import * as sns from 'aws-cdk-lib/aws-sns'
+import * as ecs from 'aws-cdk-lib/aws-ecs'
 import * as sns_subscriptions from 'aws-cdk-lib/aws-sns-subscriptions'
 import { EcsConstruct } from './constructs/ecs-construct'
 import { RdsConstruct } from './constructs/rds-construct'
+import { RemovalPolicyAspect } from './aspects/removal-policy-aspect'
 
 interface SybMvpStackProps extends cdk.StackProps {
   cidrBlock: string
@@ -20,6 +22,8 @@ interface SybMvpStackProps extends cdk.StackProps {
   sequencerPort: number
   circuitDomain: string
   circuitPort: number
+  sequencerInitialImageTag: string
+  circuitInitialImageTag: string
 }
 
 export class SybMvpStack extends cdk.Stack {
@@ -27,15 +31,16 @@ export class SybMvpStack extends cdk.Stack {
   public readonly rdsSecurityGroup: ec2.SecurityGroup
   public readonly bastion: ec2.Instance
   public readonly slackNotifier: lambda.Function
-  public readonly ecrRepo: ecr.Repository
+  public readonly ecrRepo: ecr.IRepository
   public readonly route53: route53.IHostedZone
 
   constructor(scope: Construct, id: string, props: SybMvpStackProps) {
     super(scope, id, props)
 
+    // TODO: public subnets are being assigned an EIP, investigate if necessary
     this.vpc = new ec2.Vpc(this, 'ProdVPC', {
       ipAddresses: ec2.IpAddresses.cidr(props.cidrBlock),
-      maxAzs: 1,
+      maxAzs: 2,
       subnetConfiguration: [
         {
           cidrMask: 24,
@@ -70,10 +75,7 @@ export class SybMvpStack extends cdk.Stack {
       machineImage: ec2.MachineImage.latestAmazonLinux2(),
       vpcSubnets: {
         subnetType: ec2.SubnetType.PUBLIC
-      },
-      keyPair: ec2.KeyPair.fromKeyPairAttributes(this, 'KeyPair', {
-        keyPairName: 'bastion-key-name'
-      }) // TODO: To be replaced with actual key name
+      }
     })
 
     this.bastion.connections.allowFrom(
@@ -99,17 +101,21 @@ export class SybMvpStack extends cdk.Stack {
       }
     })
 
-    this.ecrRepo = new ecr.Repository(this, 'EcrRepo', {
-      repositoryName: 'main-ecr-repo'
-    })
+    this.ecrRepo = ecr.Repository.fromRepositoryName(
+      this,
+      'EcrRepo',
+      `${props.deploymentEnv}-ecr-repo`
+    )
 
     this.route53 = new route53.HostedZone(this, 'HostedZone', {
       zoneName: props.route53DomainName,
       vpcs: [this.vpc]
     })
-    new cdk.CfnOutput(this, 'NameServers', {
-      value: cdk.Fn.join(', ', this.route53.hostedZoneNameServers || [])
-    })
+
+    // TODO: investigate if necessary
+    // new cdk.CfnOutput(this, 'NameServers', {
+    //   value: cdk.Fn.join(', ', this.route53.hostedZoneNameServers || [])
+    // })
 
     const budgetNotificationTopic = new sns.Topic(
       this,
@@ -171,8 +177,12 @@ export class SybMvpStack extends cdk.Stack {
       ]
     })
 
+    const cluster = new ecs.Cluster(this, 'EcsCluster', {
+      vpc: this.vpc
+    })
+
     // sequencer ECS resources
-    new EcsConstruct(this, 'EcsConstruct', {
+    new EcsConstruct(this, 'SequencerEcsConstruct', {
       vpc: this.vpc,
       slackNotifier: this.slackNotifier,
       ecrRepo: this.ecrRepo,
@@ -182,17 +192,24 @@ export class SybMvpStack extends cdk.Stack {
       service: 'sequencer',
       deploymentEnv: props.deploymentEnv,
       serverPort: props.sequencerPort,
-      domainName: props.sequencerDomain
+      domainName: props.sequencerDomain,
+      cluster,
+      initialImageTag: props.sequencerInitialImageTag,
+      maxEc2ScalingCapacity: 1,
+      maxTaskScalingCapacity: 1
     })
 
     // sequencer RDS resources
     new RdsConstruct(this, 'RdsConstruct', {
       vpc: this.vpc,
       cidrBlock: props.cidrBlock,
-      rdsSecurityGroup: this.rdsSecurityGroup
+      rdsSecurityGroup: this.rdsSecurityGroup,
+      deploymentEnv: props.deploymentEnv
     })
 
     // circuit ECS resources
+    // TODO: circuit needs to be serverless as it runs only at certain times and is expensive to run
+    // update EcsConstruct to support serverless
     new EcsConstruct(this, 'CircuitEcsConstruct', {
       vpc: this.vpc,
       slackNotifier: this.slackNotifier,
@@ -203,7 +220,13 @@ export class SybMvpStack extends cdk.Stack {
       service: 'circuit',
       deploymentEnv: props.deploymentEnv,
       serverPort: props.circuitPort,
-      domainName: props.circuitDomain
+      domainName: props.circuitDomain,
+      cluster,
+      initialImageTag: props.circuitInitialImageTag,
+      maxEc2ScalingCapacity: 1,
+      maxTaskScalingCapacity: 1
     })
+
+    cdk.Aspects.of(this).add(new RemovalPolicyAspect())
   }
 }

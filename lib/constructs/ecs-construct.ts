@@ -14,9 +14,7 @@ import * as autoscaling from 'aws-cdk-lib/aws-autoscaling'
 import * as iam from 'aws-cdk-lib/aws-iam'
 import * as codedeploy from 'aws-cdk-lib/aws-codedeploy'
 import * as elbv2 from 'aws-cdk-lib/aws-elasticloadbalancingv2'
-
-export type Service = 'sequencer' | 'client' | 'circuit'
-export type Env = 'main' | 'test'
+import { Env, Service } from '../types'
 
 interface EcsConstructProps extends cdk.StackProps {
   vpc: ec2.Vpc
@@ -25,19 +23,26 @@ interface EcsConstructProps extends cdk.StackProps {
   domainName: string
   slackWebhookUrl: string
   slackNotifier: lambda.Function
-  ecrRepo: ecr.Repository
+  ecrRepo: ecr.IRepository
   route53: route53.IHostedZone
   service: Service
   deploymentEnv: Env
+  cluster: ecs.Cluster
+  initialImageTag: string
+  maxEc2ScalingCapacity: number
+  maxTaskScalingCapacity: number
 }
 
 export class EcsConstruct extends Construct {
   constructor(scope: Construct, id: string, props: EcsConstructProps) {
     super(scope, id)
 
-    const cluster = new ecs.Cluster(this, 'EcsCluster', {
-      vpc: props.vpc
+    const ecsInstanceRole = new iam.Role(this, 'EcsInstanceRole', {
+      assumedBy: new iam.ServicePrincipal('ec2.amazonaws.com')
     })
+    ecsInstanceRole.addManagedPolicy(
+      iam.ManagedPolicy.fromAwsManagedPolicyName('AmazonSSMManagedInstanceCore')
+    )
 
     const autoScalingGroup = new ecs.AsgCapacityProvider(
       this,
@@ -48,36 +53,51 @@ export class EcsConstruct extends Construct {
           'DefaultAutoScalingGroup',
           {
             vpc: props.vpc,
-            instanceType: new ec2.InstanceType('t2.micro'),
+            instanceType: new ec2.InstanceType('t3.medium'),
             machineImage: ecs.EcsOptimizedImage.amazonLinux2(),
             minCapacity: 1,
+            role: ecsInstanceRole,
 
             // An EBS volume can only be used by a single instance at a time
             // This is why we set maxCapacity to 1 for the sequencer service
             // Need to figure out a better way to handle this
-            maxCapacity: props.service === 'sequencer' ? 1 : 5
+            maxCapacity: props.maxEc2ScalingCapacity
           }
         )
       }
     )
 
-    cluster.addAsgCapacityProvider(autoScalingGroup)
+    props.cluster.addAsgCapacityProvider(autoScalingGroup)
 
     const taskDefinition = new ecs.Ec2TaskDefinition(this, 'TaskDef')
 
     const container = taskDefinition.addContainer('AppContainer', {
-      image: ecs.ContainerImage.fromEcrRepository(props.ecrRepo),
-      memoryLimitMiB: 512,
-      cpu: 256,
-      logging: ecs.LogDrivers.awsLogs({ streamPrefix: 'ecs' })
+      image: ecs.ContainerImage.fromEcrRepository(
+        props.ecrRepo,
+        props.initialImageTag
+      ),
+      memoryLimitMiB: 1024,
+      cpu: 512,
+      logging: ecs.LogDrivers.awsLogs({ streamPrefix: 'ecs' }),
+      healthCheck: {
+        command: [
+          'CMD-SHELL',
+          `curl -f http://localhost:${props.serverPort}/health || exit 1`
+        ],
+        interval: cdk.Duration.seconds(30),
+        timeout: cdk.Duration.seconds(5),
+        retries: 3
+      }
     })
 
     container.addPortMappings({
-      containerPort: props.serverPort
+      containerPort: props.serverPort,
+      // TODO: experimental, for some reason requests are not reaching the container
+      hostPort: props.serverPort
     })
 
     const service = new ecs.Ec2Service(this, 'Ec2Service', {
-      cluster,
+      cluster: props.cluster,
       taskDefinition,
       deploymentController: {
         type: ecs.DeploymentControllerType.CODE_DEPLOY
@@ -97,7 +117,14 @@ export class EcsConstruct extends Construct {
     const blueTargetGroup = listener.addTargets('BlueTargetGroup', {
       port: props.serverPort,
       targets: [service],
-      protocol: elbv2.ApplicationProtocol.HTTP
+      protocol: elbv2.ApplicationProtocol.HTTP,
+      healthCheck: {
+        path: '/health',
+        interval: cdk.Duration.seconds(30),
+        timeout: cdk.Duration.seconds(3),
+        healthyThresholdCount: 2,
+        unhealthyThresholdCount: 2
+      }
     })
 
     const greenTargetGroup = new elbv2.ApplicationTargetGroup(
@@ -126,7 +153,9 @@ export class EcsConstruct extends Construct {
       deploymentConfig: codedeploy.EcsDeploymentConfig.CANARY_10PERCENT_5MINUTES
     })
 
-    const scaling = service.autoScaleTaskCount({ maxCapacity: 5 })
+    const scaling = service.autoScaleTaskCount({
+      maxCapacity: props.maxTaskScalingCapacity
+    })
     scaling.scaleOnCpuUtilization('CpuScaling', {
       targetUtilizationPercent: 90
     })
@@ -165,25 +194,7 @@ export class EcsConstruct extends Construct {
     cpuAlarm.addAlarmAction(new cloudwatch_actions.SnsAction(topic))
     memoryAlarm.addAlarmAction(new cloudwatch_actions.SnsAction(topic))
 
-    props.vpc.addInterfaceEndpoint(
-      `SSM-${props.service}-${props.deploymentEnv}`,
-      {
-        service: ec2.InterfaceVpcEndpointAwsService.SSM
-      }
-    )
-    props.vpc.addInterfaceEndpoint(
-      `SSMMessages-${props.service}-${props.deploymentEnv}`,
-      {
-        service: ec2.InterfaceVpcEndpointAwsService.SSM_MESSAGES
-      }
-    )
-    props.vpc.addInterfaceEndpoint(
-      `EC2Messages-${props.service}-${props.deploymentEnv}`,
-      {
-        service: ec2.InterfaceVpcEndpointAwsService.EC2_MESSAGES
-      }
-    )
-
+    // TODO: for some reason EC2 instances don't have inbound SG rules attached
     const ecsSecurityGroup = new ec2.SecurityGroup(this, 'EcsSecurityGroup', {
       vpc: props.vpc,
       allowAllOutbound: true
@@ -192,6 +203,10 @@ export class EcsConstruct extends Construct {
       ec2.Peer.ipv4(props.cidrBlock),
       ec2.Port.tcp(props.serverPort),
       'Allow traffic to server port'
+    )
+    ecsSecurityGroup.connections.allowFrom(
+      loadBalancer,
+      ec2.Port.tcp(props.serverPort)
     )
     service.connections.addSecurityGroup(ecsSecurityGroup)
 

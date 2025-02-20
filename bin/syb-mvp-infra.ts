@@ -36,6 +36,23 @@ if (!CIRCUIT_MAIN_DOMAIN || !CIRCUIT_MAIN_PORT) {
   throw new Error('CIRCUIT_MAIN_DOMAIN or CIRCUIT_MAIN_PORT not provided')
 }
 
+const SEQUENCER_MAIN_INITIAL_IMAGE_TAG =
+  process.env.SEQUENCER_MAIN_INITIAL_IMAGE_TAG
+const SEQUENCER_TEST_INITIAL_IMAGE_TAG =
+  process.env.SEQUENCER_TEST_INITIAL_IMAGE_TAG
+const CIRCUIT_MAIN_INITIAL_IMAGE_TAG =
+  process.env.CIRCUIT_MAIN_INITIAL_IMAGE_TAG
+const CIRCUIT_TEST_INITIAL_IMAGE_TAG =
+  process.env.CIRCUIT_TEST_INITIAL_IMAGE_TAG
+if (
+  !SEQUENCER_MAIN_INITIAL_IMAGE_TAG ||
+  !SEQUENCER_TEST_INITIAL_IMAGE_TAG ||
+  !CIRCUIT_MAIN_INITIAL_IMAGE_TAG ||
+  !CIRCUIT_TEST_INITIAL_IMAGE_TAG
+) {
+  throw new Error('some initial image tags not provided')
+}
+
 const app = new cdk.App()
 
 new SybMvpStack(app, 'SybMvpMainStack', {
@@ -47,7 +64,9 @@ new SybMvpStack(app, 'SybMvpMainStack', {
   sequencerDomain: SEQUENCER_MAIN_DOMAIN,
   sequencerPort: parseInt(SEQUENCER_MAIN_PORT),
   circuitDomain: CIRCUIT_MAIN_DOMAIN,
-  circuitPort: parseInt(CIRCUIT_MAIN_PORT)
+  circuitPort: parseInt(CIRCUIT_MAIN_PORT),
+  sequencerInitialImageTag: SEQUENCER_MAIN_INITIAL_IMAGE_TAG,
+  circuitInitialImageTag: CIRCUIT_MAIN_INITIAL_IMAGE_TAG
 })
 
 new SybMvpStack(app, 'SybMvpTestStack', {
@@ -59,5 +78,7 @@ new SybMvpStack(app, 'SybMvpTestStack', {
   sequencerDomain: SEQUENCER_TEST_DOMAIN,
   sequencerPort: parseInt(SEQUENCER_TEST_PORT),
   circuitDomain: CIRCUIT_TEST_DOMAIN,
-  circuitPort: parseInt(CIRCUIT_TEST_PORT)
+  circuitPort: parseInt(CIRCUIT_TEST_PORT),
+  sequencerInitialImageTag: SEQUENCER_TEST_INITIAL_IMAGE_TAG,
+  circuitInitialImageTag: CIRCUIT_TEST_INITIAL_IMAGE_TAG
 })
