@@ -8,9 +8,12 @@ import * as budgets from 'aws-cdk-lib/aws-budgets'
 import * as sns from 'aws-cdk-lib/aws-sns'
 import * as ecs from 'aws-cdk-lib/aws-ecs'
 import * as sns_subscriptions from 'aws-cdk-lib/aws-sns-subscriptions'
+import * as dotenv from 'dotenv'
 import { EcsConstruct } from './constructs/ecs-construct'
 import { RdsConstruct } from './constructs/rds-construct'
 import { RemovalPolicyAspect } from './aspects/removal-policy-aspect'
+
+dotenv.config()
 
 interface SybMvpStackProps extends cdk.StackProps {
   cidrBlock: string
@@ -181,51 +184,52 @@ export class SybMvpStack extends cdk.Stack {
       vpc: this.vpc
     })
 
-    // sequencer ECS resources
-    new EcsConstruct(this, 'SequencerEcsConstruct', {
-      vpc: this.vpc,
-      slackNotifier: this.slackNotifier,
-      ecrRepo: this.ecrRepo,
-      route53: this.route53,
-      slackWebhookUrl: props.slackWebhookUrl,
-      cidrBlock: props.cidrBlock,
-      service: 'sequencer',
-      deploymentEnv: props.deploymentEnv,
-      serverPort: props.sequencerPort,
-      domainName: props.sequencerDomain,
-      cluster,
-      initialImageTag: props.sequencerInitialImageTag,
-      maxEc2ScalingCapacity: 1,
-      maxTaskScalingCapacity: 1
-    })
+    if (process.env.DEPLOY_SEQUENCER === 'true') {
+      new EcsConstruct(this, 'SequencerEcsConstruct', {
+        vpc: this.vpc,
+        slackNotifier: this.slackNotifier,
+        ecrRepo: this.ecrRepo,
+        route53: this.route53,
+        slackWebhookUrl: props.slackWebhookUrl,
+        cidrBlock: props.cidrBlock,
+        service: 'sequencer',
+        deploymentEnv: props.deploymentEnv,
+        serverPort: props.sequencerPort,
+        domainName: props.sequencerDomain,
+        cluster,
+        initialImageTag: props.sequencerInitialImageTag,
+        maxEc2ScalingCapacity: 1,
+        maxTaskScalingCapacity: 1
+      })
 
-    // sequencer RDS resources
-    new RdsConstruct(this, 'RdsConstruct', {
-      vpc: this.vpc,
-      cidrBlock: props.cidrBlock,
-      rdsSecurityGroup: this.rdsSecurityGroup,
-      deploymentEnv: props.deploymentEnv
-    })
+      new RdsConstruct(this, 'RdsConstruct', {
+        vpc: this.vpc,
+        cidrBlock: props.cidrBlock,
+        rdsSecurityGroup: this.rdsSecurityGroup,
+        deploymentEnv: props.deploymentEnv
+      })
+    }
 
-    // circuit ECS resources
-    // TODO: circuit needs to be serverless as it runs only at certain times and is expensive to run
-    // update EcsConstruct to support serverless
-    new EcsConstruct(this, 'CircuitEcsConstruct', {
-      vpc: this.vpc,
-      slackNotifier: this.slackNotifier,
-      ecrRepo: this.ecrRepo,
-      route53: this.route53,
-      slackWebhookUrl: props.slackWebhookUrl,
-      cidrBlock: props.cidrBlock,
-      service: 'circuit',
-      deploymentEnv: props.deploymentEnv,
-      serverPort: props.circuitPort,
-      domainName: props.circuitDomain,
-      cluster,
-      initialImageTag: props.circuitInitialImageTag,
-      maxEc2ScalingCapacity: 1,
-      maxTaskScalingCapacity: 1
-    })
+    if (process.env.DEPLOY_CIRCUIT === 'true') {
+      // TODO: circuit needs to be serverless as it runs only at certain times and is expensive to run
+      // update EcsConstruct to support serverless
+      new EcsConstruct(this, 'CircuitEcsConstruct', {
+        vpc: this.vpc,
+        slackNotifier: this.slackNotifier,
+        ecrRepo: this.ecrRepo,
+        route53: this.route53,
+        slackWebhookUrl: props.slackWebhookUrl,
+        cidrBlock: props.cidrBlock,
+        service: 'circuit',
+        deploymentEnv: props.deploymentEnv,
+        serverPort: props.circuitPort,
+        domainName: props.circuitDomain,
+        cluster,
+        initialImageTag: props.circuitInitialImageTag,
+        maxEc2ScalingCapacity: 1,
+        maxTaskScalingCapacity: 1
+      })
+    }
 
     cdk.Aspects.of(this).add(new RemovalPolicyAspect())
   }
