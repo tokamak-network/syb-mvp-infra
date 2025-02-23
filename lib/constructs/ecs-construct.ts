@@ -37,6 +37,16 @@ export class EcsConstruct extends Construct {
   constructor(scope: Construct, id: string, props: EcsConstructProps) {
     super(scope, id)
 
+    const loadBalancer = new elbv2.ApplicationLoadBalancer(this, 'LB', {
+      vpc: props.vpc,
+      internetFacing: true
+    })
+
+    const listener = loadBalancer.addListener('Listener', {
+      port: props.serverPort,
+      protocol: elbv2.ApplicationProtocol.HTTP
+    })
+
     const ecsInstanceRole = new iam.Role(this, 'EcsInstanceRole', {
       assumedBy: new iam.ServicePrincipal('ec2.amazonaws.com')
     })
@@ -65,6 +75,19 @@ export class EcsConstruct extends Construct {
           }
         )
       }
+    )
+    const instanceSG =
+      autoScalingGroup.autoScalingGroup.connections.securityGroups[0]
+
+    instanceSG.addIngressRule(
+      ec2.Peer.ipv4(props.cidrBlock),
+      ec2.Port.tcp(props.serverPort),
+      'Allow traffic on server port'
+    )
+
+    instanceSG.connections.allowFrom(
+      loadBalancer,
+      ec2.Port.tcp(props.serverPort)
     )
 
     props.cluster.addAsgCapacityProvider(autoScalingGroup)
@@ -102,16 +125,6 @@ export class EcsConstruct extends Construct {
       deploymentController: {
         type: ecs.DeploymentControllerType.CODE_DEPLOY
       }
-    })
-
-    const loadBalancer = new elbv2.ApplicationLoadBalancer(this, 'LB', {
-      vpc: props.vpc,
-      internetFacing: true
-    })
-
-    const listener = loadBalancer.addListener('Listener', {
-      port: props.serverPort,
-      protocol: elbv2.ApplicationProtocol.HTTP
     })
 
     const blueTargetGroup = listener.addTargets('BlueTargetGroup', {
