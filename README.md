@@ -24,7 +24,7 @@ Start a port forwarding session from your local machine to the RDS instance thro
 ```bash
 aws ssm start-session --target <bastion-instance-id> \
   --document-name AWS-StartPortForwardingSession \
-  --parameters '{"portNumber":["5432"],"localPortNumber":["5432"]}'
+  --parameters '{"host": ["<rds-endpoint>"] "portNumber":["5432"],"localPortNumber":["5432"]}'
 ```
 
 Configure your DBMS tool to connect to `localhost:5432` to access the RDS.

@@ -12,7 +12,6 @@ import * as dotenv from 'dotenv'
 import { EcsConstruct } from './constructs/ecs-construct'
 import { RdsConstruct } from './constructs/rds-construct'
 import { RemovalPolicyAspect } from './aspects/removal-policy-aspect'
-import * as iam from 'aws-cdk-lib/aws-iam'
 
 dotenv.config()
 
@@ -32,8 +31,6 @@ interface SybMvpStackProps extends cdk.StackProps {
 
 export class SybMvpStack extends cdk.Stack {
   public readonly vpc: ec2.Vpc
-  public readonly rdsSecurityGroup: ec2.SecurityGroup
-  public readonly bastion: ec2.Instance
   public readonly slackNotifier: lambda.Function
   public readonly ecrRepo: ecr.IRepository
   public readonly route53: route53.IHostedZone
@@ -58,53 +55,6 @@ export class SybMvpStack extends cdk.Stack {
         }
       ]
     })
-
-    this.rdsSecurityGroup = new ec2.SecurityGroup(this, 'RdsSecurityGroup', {
-      vpc: this.vpc,
-      allowAllOutbound: true
-    })
-
-    this.rdsSecurityGroup.addIngressRule(
-      ec2.Peer.ipv4(props.cidrBlock),
-      ec2.Port.tcp(5432),
-      'Allow ECS instances to access RDS'
-    )
-
-    const bastionSsmRole = new iam.Role(this, 'BastionSsmRole', {
-      assumedBy: new iam.ServicePrincipal('ec2.amazonaws.com'),
-      managedPolicies: [
-        iam.ManagedPolicy.fromAwsManagedPolicyName(
-          'AmazonSSMManagedInstanceCore'
-        )
-      ]
-    })
-
-    // Todo: haven't been tested yet
-    const bastionUserData = ec2.UserData.forLinux()
-    bastionUserData.addCommands(
-      'sudo amazon-linux-extras install postgresql16 -y'
-    )
-
-    // TODO: consider moving to the rds-construct since it's specific to the RDS
-    this.bastion = new ec2.Instance(this, 'BastionHost', {
-      vpc: this.vpc,
-      instanceType: ec2.InstanceType.of(
-        ec2.InstanceClass.T2,
-        ec2.InstanceSize.MICRO
-      ),
-      machineImage: ec2.MachineImage.latestAmazonLinux2(),
-      role: bastionSsmRole,
-      vpcSubnets: {
-        subnetType: ec2.SubnetType.PUBLIC
-      },
-      userData: bastionUserData
-    })
-
-    this.rdsSecurityGroup.addIngressRule(
-      this.bastion.connections.securityGroups[0],
-      ec2.Port.tcp(5432),
-      'Allow bastion host to access RDS'
-    )
 
     this.slackNotifier = new lambda.Function(this, 'SlackNotifier', {
       runtime: lambda.Runtime.NODEJS_LATEST,
@@ -218,7 +168,6 @@ export class SybMvpStack extends cdk.Stack {
       new RdsConstruct(this, 'RdsConstruct', {
         vpc: this.vpc,
         cidrBlock: props.cidrBlock,
-        rdsSecurityGroup: this.rdsSecurityGroup,
         deploymentEnv: props.deploymentEnv
       })
     }
