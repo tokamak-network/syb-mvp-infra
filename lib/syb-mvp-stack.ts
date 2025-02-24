@@ -12,6 +12,7 @@ import * as dotenv from 'dotenv'
 import { EcsConstruct } from './constructs/ecs-construct'
 import { RdsConstruct } from './constructs/rds-construct'
 import { RemovalPolicyAspect } from './aspects/removal-policy-aspect'
+import * as iam from 'aws-cdk-lib/aws-iam'
 
 dotenv.config()
 
@@ -69,6 +70,22 @@ export class SybMvpStack extends cdk.Stack {
       'Allow ECS instances to access RDS'
     )
 
+    const bastionSsmRole = new iam.Role(this, 'BastionSsmRole', {
+      assumedBy: new iam.ServicePrincipal('ec2.amazonaws.com'),
+      managedPolicies: [
+        iam.ManagedPolicy.fromAwsManagedPolicyName(
+          'AmazonSSMManagedInstanceCore'
+        )
+      ]
+    })
+
+    // Todo: haven't been tested yet
+    const bastionUserData = ec2.UserData.forLinux()
+    bastionUserData.addCommands(
+      'sudo amazon-linux-extras install postgresql16 -y'
+    )
+
+    // TODO: consider moving to the rds-construct since it's specific to the RDS
     this.bastion = new ec2.Instance(this, 'BastionHost', {
       vpc: this.vpc,
       instanceType: ec2.InstanceType.of(
@@ -76,16 +93,12 @@ export class SybMvpStack extends cdk.Stack {
         ec2.InstanceSize.MICRO
       ),
       machineImage: ec2.MachineImage.latestAmazonLinux2(),
+      role: bastionSsmRole,
       vpcSubnets: {
         subnetType: ec2.SubnetType.PUBLIC
-      }
+      },
+      userData: bastionUserData
     })
-
-    this.bastion.connections.allowFrom(
-      ec2.Peer.anyIpv4(),
-      ec2.Port.tcp(22),
-      'Allow SSH access from the internet'
-    )
 
     this.rdsSecurityGroup.addIngressRule(
       this.bastion.connections.securityGroups[0],

@@ -13,10 +13,18 @@ The `cdk.json` file tells the CDK Toolkit how to execute your app.
 
 ## DB connection
 
-Start an SSH tunnel from your local machine to the RDS instance through the bastion host:
+RDS is hosted in a private subnet and the only way to access it is through the Bastion host, which is also limited to only SSM connection. To establish an SSM connection to the Bastion host, ensure you have the plugin installed:
 
 ```bash
-ssh -i /path/to/your-key-pair.pem -L 5432:<rds-endpoint>:5432 ec2-user@<bastion-host-public-ip>
+brew install session-manager-plugin
+```
+
+Start a port forwarding session from your local machine to the RDS instance through the bastion host:
+
+```bash
+aws ssm start-session --target <bastion-instance-id> \
+  --document-name AWS-StartPortForwardingSession \
+  --parameters '{"portNumber":["5432"],"localPortNumber":["5432"]}'
 ```
 
 Configure your DBMS tool to connect to `localhost:5432` to access the RDS.
