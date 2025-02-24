@@ -51,7 +51,11 @@ export class RdsConstruct extends Construct {
         subnetType: ec2.SubnetType.PRIVATE_WITH_EGRESS
       },
       securityGroups: [rdsSecurityGroup],
-      deletionProtection: props.deploymentEnv === 'main' ? true : false
+      deletionProtection: props.deploymentEnv === 'main' ? true : false,
+      backupRetention:
+        props.deploymentEnv === 'main'
+          ? cdk.Duration.days(7)
+          : cdk.Duration.days(0)
     })
 
     // TODO: for some reason installs postgresql 10, investigate
