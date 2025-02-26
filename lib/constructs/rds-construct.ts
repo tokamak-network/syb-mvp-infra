@@ -55,7 +55,10 @@ export class RdsConstruct extends Construct {
       backupRetention:
         props.deploymentEnv === 'main'
           ? cdk.Duration.days(7)
-          : cdk.Duration.days(0)
+          : cdk.Duration.days(0),
+      credentials: rds.Credentials.fromGeneratedSecret('postgres', {
+        secretName: `rds-credentials-${props.deploymentEnv}`
+      })
     })
 
     // TODO: for some reason installs postgresql 10, investigate
