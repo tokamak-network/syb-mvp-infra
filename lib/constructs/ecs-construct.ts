@@ -63,7 +63,7 @@ export class EcsConstruct extends Construct {
           'DefaultAutoScalingGroup',
           {
             vpc: props.vpc,
-            instanceType: new ec2.InstanceType('t3.small'),
+            instanceType: new ec2.InstanceType('t3.medium'),
             machineImage: ecs.EcsOptimizedImage.amazonLinux2(),
             minCapacity: 1,
             role: ecsInstanceRole,

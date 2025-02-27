@@ -42,3 +42,11 @@ cdk bootstrap
 - `cdk deploy <StackName>` deploys the specified stack
 - `cdk diff <StackName>` compare deployed stack with current state
 - `cdk destroy <StackName>` delete specified stack
+
+## Manually push local image to ECR
+
+```bash
+aws ecr get-login-password --region <region> | docker login --username AWS --password-stdin <aws_account_id>.dkr.ecr.<region>.amazonaws.com
+docker tag my-image:latest <aws_account_id>.dkr.ecr.<region>.amazonaws.com/my-repo:latest
+docker push <aws_account_id>.dkr.ecr.<region>.amazonaws.com/my-repo:latest
+```
