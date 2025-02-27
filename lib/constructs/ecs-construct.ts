@@ -108,7 +108,7 @@ export class EcsConstruct extends Construct {
       healthCheck: {
         command: [
           'CMD-SHELL',
-          `curl -f http://localhost:${props.serverPort}/health || exit 1`
+          `curl -f http://localhost:${props.serverPort}/v1/health || exit 1`
         ],
         interval: cdk.Duration.seconds(30),
         timeout: cdk.Duration.seconds(5),
@@ -135,7 +135,7 @@ export class EcsConstruct extends Construct {
       targets: [service],
       protocol: elbv2.ApplicationProtocol.HTTP,
       healthCheck: {
-        path: '/health',
+        path: '/v1/health',
         interval: cdk.Duration.seconds(30),
         timeout: cdk.Duration.seconds(3),
         healthyThresholdCount: 2,

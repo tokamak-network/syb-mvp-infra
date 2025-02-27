@@ -46,7 +46,7 @@ cdk bootstrap
 ## Manually push local image to ECR
 
 ```bash
-aws ecr get-login-password --region <region> | docker login --username AWS --password-stdin <aws_account_id>.dkr.ecr.<region>.amazonaws.com
-docker tag my-image:latest <aws_account_id>.dkr.ecr.<region>.amazonaws.com/my-repo:latest
-docker push <aws_account_id>.dkr.ecr.<region>.amazonaws.com/my-repo:latest
+aws ecr get-login-password --region $AWS_REGION --profile default | docker login --username AWS --password-stdin $AWS_ACCOUNT_ID.dkr.ecr.$AWS_REGION.amazonaws.com
+docker tag my-image:latest $AWS_ACCOUNT_ID.dkr.ecr.$AWS_REGION.amazonaws.com/my-repo:latest
+docker push $AWS_ACCOUNT_ID.dkr.ecr.$AWS_REGION.amazonaws.com/my-repo:latest
 ```
