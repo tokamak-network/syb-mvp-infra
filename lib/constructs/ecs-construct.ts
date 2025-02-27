@@ -103,7 +103,7 @@ export class EcsConstruct extends Construct {
         props.initialImageTag
       ),
       memoryReservationMiB: 2048,
-      cpu: 2048,
+      cpu: 1024,
       logging: ecs.LogDrivers.awsLogs({ streamPrefix: 'ecs' }),
       healthCheck: {
         command: [
@@ -150,7 +150,14 @@ export class EcsConstruct extends Construct {
         vpc: props.vpc,
         port: props.serverPort,
         targetType: elbv2.TargetType.INSTANCE,
-        protocol: elbv2.ApplicationProtocol.HTTP
+        protocol: elbv2.ApplicationProtocol.HTTP,
+        healthCheck: {
+          path: '/v1/health',
+          interval: cdk.Duration.seconds(30),
+          timeout: cdk.Duration.seconds(3),
+          healthyThresholdCount: 2,
+          unhealthyThresholdCount: 5
+        }
       }
     )
 
