@@ -93,6 +93,9 @@ export class EcsConstruct extends Construct {
     props.cluster.addAsgCapacityProvider(autoScalingGroup)
 
     const taskDefinition = new ecs.Ec2TaskDefinition(this, 'TaskDef')
+    taskDefinition.taskRole.addManagedPolicy(
+      iam.ManagedPolicy.fromAwsManagedPolicyName('SecretsManagerReadWrite')
+    )
 
     const container = taskDefinition.addContainer('AppContainer', {
       image: ecs.ContainerImage.fromEcrRepository(
