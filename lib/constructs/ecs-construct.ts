@@ -102,8 +102,8 @@ export class EcsConstruct extends Construct {
         props.ecrRepo,
         props.initialImageTag
       ),
-      memoryLimitMiB: 1024,
-      cpu: 512,
+      memoryReservationMiB: 2048,
+      cpu: 2048,
       logging: ecs.LogDrivers.awsLogs({ streamPrefix: 'ecs' }),
       healthCheck: {
         command: [
@@ -112,7 +112,7 @@ export class EcsConstruct extends Construct {
         ],
         interval: cdk.Duration.seconds(30),
         timeout: cdk.Duration.seconds(5),
-        retries: 3
+        retries: 5
       }
     })
 
@@ -139,7 +139,7 @@ export class EcsConstruct extends Construct {
         interval: cdk.Duration.seconds(30),
         timeout: cdk.Duration.seconds(3),
         healthyThresholdCount: 2,
-        unhealthyThresholdCount: 2
+        unhealthyThresholdCount: 5
       }
     })
 
