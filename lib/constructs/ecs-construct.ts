@@ -37,6 +37,16 @@ export class EcsConstruct extends Construct {
   constructor(scope: Construct, id: string, props: EcsConstructProps) {
     super(scope, id)
 
+    const loadBalancer = new elbv2.ApplicationLoadBalancer(this, 'LB', {
+      vpc: props.vpc,
+      internetFacing: true
+    })
+
+    const listener = loadBalancer.addListener('Listener', {
+      port: props.serverPort,
+      protocol: elbv2.ApplicationProtocol.HTTP
+    })
+
     const ecsInstanceRole = new iam.Role(this, 'EcsInstanceRole', {
       assumedBy: new iam.ServicePrincipal('ec2.amazonaws.com')
     })
@@ -66,27 +76,43 @@ export class EcsConstruct extends Construct {
         )
       }
     )
+    const instanceSG =
+      autoScalingGroup.autoScalingGroup.connections.securityGroups[0]
+
+    instanceSG.addIngressRule(
+      ec2.Peer.ipv4(props.cidrBlock),
+      ec2.Port.tcp(props.serverPort),
+      'Allow traffic on server port'
+    )
+
+    instanceSG.connections.allowFrom(
+      loadBalancer,
+      ec2.Port.tcp(props.serverPort)
+    )
 
     props.cluster.addAsgCapacityProvider(autoScalingGroup)
 
     const taskDefinition = new ecs.Ec2TaskDefinition(this, 'TaskDef')
+    taskDefinition.taskRole.addManagedPolicy(
+      iam.ManagedPolicy.fromAwsManagedPolicyName('SecretsManagerReadWrite')
+    )
 
     const container = taskDefinition.addContainer('AppContainer', {
       image: ecs.ContainerImage.fromEcrRepository(
         props.ecrRepo,
         props.initialImageTag
       ),
-      memoryLimitMiB: 1024,
-      cpu: 512,
+      memoryReservationMiB: 2048,
+      cpu: 1024,
       logging: ecs.LogDrivers.awsLogs({ streamPrefix: 'ecs' }),
       healthCheck: {
         command: [
           'CMD-SHELL',
-          `curl -f http://localhost:${props.serverPort}/health || exit 1`
+          `curl -f http://localhost:${props.serverPort}/v1/health || exit 1`
         ],
         interval: cdk.Duration.seconds(30),
         timeout: cdk.Duration.seconds(5),
-        retries: 3
+        retries: 5
       }
     })
 
@@ -104,26 +130,16 @@ export class EcsConstruct extends Construct {
       }
     })
 
-    const loadBalancer = new elbv2.ApplicationLoadBalancer(this, 'LB', {
-      vpc: props.vpc,
-      internetFacing: true
-    })
-
-    const listener = loadBalancer.addListener('Listener', {
-      port: props.serverPort,
-      protocol: elbv2.ApplicationProtocol.HTTP
-    })
-
     const blueTargetGroup = listener.addTargets('BlueTargetGroup', {
       port: props.serverPort,
       targets: [service],
       protocol: elbv2.ApplicationProtocol.HTTP,
       healthCheck: {
-        path: '/health',
+        path: '/v1/health',
         interval: cdk.Duration.seconds(30),
         timeout: cdk.Duration.seconds(3),
         healthyThresholdCount: 2,
-        unhealthyThresholdCount: 2
+        unhealthyThresholdCount: 5
       }
     })
 
@@ -134,7 +150,14 @@ export class EcsConstruct extends Construct {
         vpc: props.vpc,
         port: props.serverPort,
         targetType: elbv2.TargetType.INSTANCE,
-        protocol: elbv2.ApplicationProtocol.HTTP
+        protocol: elbv2.ApplicationProtocol.HTTP,
+        healthCheck: {
+          path: '/v1/health',
+          interval: cdk.Duration.seconds(30),
+          timeout: cdk.Duration.seconds(3),
+          healthyThresholdCount: 2,
+          unhealthyThresholdCount: 5
+        }
       }
     )
 

@@ -13,10 +13,18 @@ The `cdk.json` file tells the CDK Toolkit how to execute your app.
 
 ## DB connection
 
-Start an SSH tunnel from your local machine to the RDS instance through the bastion host:
+RDS is hosted in a private subnet and the only way to access it is through the Bastion host, which is also limited to only SSM connection. To establish an SSM connection to the Bastion host, ensure you have the plugin installed:
 
 ```bash
-ssh -i /path/to/your-key-pair.pem -L 5432:<rds-endpoint>:5432 ec2-user@<bastion-host-public-ip>
+brew install session-manager-plugin
+```
+
+Start a port forwarding session from your local machine to the RDS instance through the bastion host:
+
+```bash
+aws ssm start-session --target <bastion-instance-id> \
+  --document-name AWS-StartPortForwardingSession \
+  --parameters '{"portNumber":["5432"],"localPortNumber":["5432"]}'
 ```
 
 Configure your DBMS tool to connect to `localhost:5432` to access the RDS.
@@ -34,3 +42,11 @@ cdk bootstrap
 - `cdk deploy <StackName>` deploys the specified stack
 - `cdk diff <StackName>` compare deployed stack with current state
 - `cdk destroy <StackName>` delete specified stack
+
+## Manually push local image to ECR
+
+```bash
+aws ecr get-login-password --region $AWS_REGION --profile default | docker login --username AWS --password-stdin $AWS_ACCOUNT_ID.dkr.ecr.$AWS_REGION.amazonaws.com
+docker tag my-image:latest $AWS_ACCOUNT_ID.dkr.ecr.$AWS_REGION.amazonaws.com/my-repo:latest
+docker push $AWS_ACCOUNT_ID.dkr.ecr.$AWS_REGION.amazonaws.com/my-repo:latest
+```
