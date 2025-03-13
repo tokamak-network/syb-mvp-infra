@@ -21,16 +21,16 @@ interface EcsConstructProps extends cdk.StackProps {
   cidrBlock: string
   serverPort: number
   domainName: string
-  slackWebhookUrl: string
-  slackNotifier: lambda.Function
+  // slackWebhookUrl: string
+  // slackNotifier: lambda.Function
   ecrRepo: ecr.IRepository
   route53: route53.IHostedZone
   service: Service
   deploymentEnv: Env
   cluster: ecs.Cluster
   initialImageTag: string
-  maxEc2ScalingCapacity: number
-  maxTaskScalingCapacity: number
+  // maxEc2ScalingCapacity: number
+  // maxTaskScalingCapacity: number
 }
 
 export class EcsConstruct extends Construct {
@@ -47,50 +47,50 @@ export class EcsConstruct extends Construct {
       protocol: elbv2.ApplicationProtocol.HTTP
     })
 
-    const ecsInstanceRole = new iam.Role(this, 'EcsInstanceRole', {
-      assumedBy: new iam.ServicePrincipal('ec2.amazonaws.com')
-    })
-    ecsInstanceRole.addManagedPolicy(
-      iam.ManagedPolicy.fromAwsManagedPolicyName('AmazonSSMManagedInstanceCore')
-    )
+    // const ecsInstanceRole = new iam.Role(this, 'EcsInstanceRole', {
+    //   assumedBy: new iam.ServicePrincipal('ec2.amazonaws.com')
+    // })
+    // ecsInstanceRole.addManagedPolicy(
+    //   iam.ManagedPolicy.fromAwsManagedPolicyName('AmazonSSMManagedInstanceCore')
+    // )
 
-    const autoScalingGroup = new ecs.AsgCapacityProvider(
-      this,
-      'AsgCapacityProvider',
-      {
-        autoScalingGroup: new autoscaling.AutoScalingGroup(
-          this,
-          'DefaultAutoScalingGroup',
-          {
-            vpc: props.vpc,
-            instanceType: new ec2.InstanceType('t3.medium'),
-            machineImage: ecs.EcsOptimizedImage.amazonLinux2(),
-            minCapacity: 1,
-            role: ecsInstanceRole,
+    // const autoScalingGroup = new ecs.AsgCapacityProvider(
+    //   this,
+    //   'AsgCapacityProvider',
+    //   {
+    //     autoScalingGroup: new autoscaling.AutoScalingGroup(
+    //       this,
+    //       'DefaultAutoScalingGroup',
+    //       {
+    //         vpc: props.vpc,
+    //         instanceType: new ec2.InstanceType('t3.medium'),
+    //         machineImage: ecs.EcsOptimizedImage.amazonLinux2(),
+    //         minCapacity: 1,
+    //         role: ecsInstanceRole,
 
-            // An EBS volume can only be used by a single instance at a time
-            // This is why we set maxCapacity to 1 for the sequencer service
-            // Need to figure out a better way to handle this
-            maxCapacity: props.maxEc2ScalingCapacity
-          }
-        )
-      }
-    )
-    const instanceSG =
-      autoScalingGroup.autoScalingGroup.connections.securityGroups[0]
+    //         // An EBS volume can only be used by a single instance at a time
+    //         // This is why we set maxCapacity to 1 for the sequencer service
+    //         // Need to figure out a better way to handle this
+    //         maxCapacity: props.maxEc2ScalingCapacity
+    //       }
+    //     )
+    //   }
+    // )
+    // const instanceSG =
+    //   autoScalingGroup.autoScalingGroup.connections.securityGroups[0]
 
-    instanceSG.addIngressRule(
-      ec2.Peer.ipv4(props.cidrBlock),
-      ec2.Port.tcp(props.serverPort),
-      'Allow traffic on server port'
-    )
+    // instanceSG.addIngressRule(
+    //   ec2.Peer.ipv4(props.cidrBlock),
+    //   ec2.Port.tcp(props.serverPort),
+    //   'Allow traffic on server port'
+    // )
 
-    instanceSG.connections.allowFrom(
-      loadBalancer,
-      ec2.Port.tcp(props.serverPort)
-    )
+    // instanceSG.connections.allowFrom(
+    //   loadBalancer,
+    //   ec2.Port.tcp(props.serverPort)
+    // )
 
-    props.cluster.addAsgCapacityProvider(autoScalingGroup)
+    // props.cluster.addAsgCapacityProvider(autoScalingGroup)
 
     const taskDefinition = new ecs.Ec2TaskDefinition(this, 'TaskDef')
     taskDefinition.taskRole.addManagedPolicy(
@@ -130,61 +130,61 @@ export class EcsConstruct extends Construct {
       }
     })
 
-    const blueTargetGroup = listener.addTargets('BlueTargetGroup', {
-      port: props.serverPort,
-      targets: [service],
-      protocol: elbv2.ApplicationProtocol.HTTP,
-      healthCheck: {
-        path: '/v1/health',
-        interval: cdk.Duration.seconds(30),
-        timeout: cdk.Duration.seconds(3),
-        healthyThresholdCount: 2,
-        unhealthyThresholdCount: 5
-      }
-    })
+    // const blueTargetGroup = listener.addTargets('BlueTargetGroup', {
+    //   port: props.serverPort,
+    //   targets: [service],
+    //   protocol: elbv2.ApplicationProtocol.HTTP,
+    //   healthCheck: {
+    //     path: '/v1/health',
+    //     interval: cdk.Duration.seconds(30),
+    //     timeout: cdk.Duration.seconds(3),
+    //     healthyThresholdCount: 2,
+    //     unhealthyThresholdCount: 5
+    //   }
+    // })
 
-    const greenTargetGroup = new elbv2.ApplicationTargetGroup(
-      this,
-      'GreenTargetGroup',
-      {
-        vpc: props.vpc,
-        port: props.serverPort,
-        targetType: elbv2.TargetType.INSTANCE,
-        protocol: elbv2.ApplicationProtocol.HTTP,
-        healthCheck: {
-          path: '/v1/health',
-          interval: cdk.Duration.seconds(30),
-          timeout: cdk.Duration.seconds(3),
-          healthyThresholdCount: 2,
-          unhealthyThresholdCount: 5
-        }
-      }
-    )
+    // const greenTargetGroup = new elbv2.ApplicationTargetGroup(
+    //   this,
+    //   'GreenTargetGroup',
+    //   {
+    //     vpc: props.vpc,
+    //     port: props.serverPort,
+    //     targetType: elbv2.TargetType.INSTANCE,
+    //     protocol: elbv2.ApplicationProtocol.HTTP,
+    //     healthCheck: {
+    //       path: '/v1/health',
+    //       interval: cdk.Duration.seconds(30),
+    //       timeout: cdk.Duration.seconds(3),
+    //       healthyThresholdCount: 2,
+    //       unhealthyThresholdCount: 5
+    //     }
+    //   }
+    // )
 
-    const codeDeployApp = new codedeploy.EcsApplication(this, 'CodeDeployApp', {
-      applicationName: props.service
-    })
+    // const codeDeployApp = new codedeploy.EcsApplication(this, 'CodeDeployApp', {
+    //   applicationName: props.service
+    // })
 
-    new codedeploy.EcsDeploymentGroup(this, 'BlueGreenDG', {
-      application: codeDeployApp,
-      service,
-      blueGreenDeploymentConfig: {
-        blueTargetGroup,
-        greenTargetGroup,
-        listener
-      },
-      deploymentConfig: codedeploy.EcsDeploymentConfig.CANARY_10PERCENT_5MINUTES
-    })
+    // new codedeploy.EcsDeploymentGroup(this, 'BlueGreenDG', {
+    //   application: codeDeployApp,
+    //   service,
+    //   blueGreenDeploymentConfig: {
+    //     blueTargetGroup,
+    //     greenTargetGroup,
+    //     listener
+    //   },
+    //   deploymentConfig: codedeploy.EcsDeploymentConfig.CANARY_10PERCENT_5MINUTES
+    // })
 
-    const scaling = service.autoScaleTaskCount({
-      maxCapacity: props.maxTaskScalingCapacity
-    })
-    scaling.scaleOnCpuUtilization('CpuScaling', {
-      targetUtilizationPercent: 90
-    })
-    scaling.scaleOnMemoryUtilization('MemoryScaling', {
-      targetUtilizationPercent: 80
-    })
+    // const scaling = service.autoScaleTaskCount({
+    //   maxCapacity: props.maxTaskScalingCapacity
+    // })
+    // scaling.scaleOnCpuUtilization('CpuScaling', {
+    //   targetUtilizationPercent: 90
+    // })
+    // scaling.scaleOnMemoryUtilization('MemoryScaling', {
+    //   targetUtilizationPercent: 80
+    // })
 
     new route53.ARecord(this, 'AliasRecord', {
       zone: props.route53,
@@ -194,96 +194,96 @@ export class EcsConstruct extends Construct {
       )
     })
 
-    const topic = new sns.Topic(
-      this,
-      `AlarmTopic-${props.service}-${props.deploymentEnv}`
-    )
-    topic.addSubscription(
-      new sns_subscriptions.LambdaSubscription(props.slackNotifier)
-    )
+    // const topic = new sns.Topic(
+    //   this,
+    //   `AlarmTopic-${props.service}-${props.deploymentEnv}`
+    // )
+    // topic.addSubscription(
+    //   new sns_subscriptions.LambdaSubscription(props.slackNotifier)
+    // )
 
-    const cpuAlarm = new cloudwatch.Alarm(this, 'CpuAlarm', {
-      metric: service.metricCpuUtilization(),
-      threshold: 90,
-      evaluationPeriods: 2
-    })
+    // const cpuAlarm = new cloudwatch.Alarm(this, 'CpuAlarm', {
+    //   metric: service.metricCpuUtilization(),
+    //   threshold: 90,
+    //   evaluationPeriods: 2
+    // })
 
-    const memoryAlarm = new cloudwatch.Alarm(this, 'MemoryAlarm', {
-      metric: service.metricMemoryUtilization(),
-      threshold: 80,
-      evaluationPeriods: 2
-    })
+    // const memoryAlarm = new cloudwatch.Alarm(this, 'MemoryAlarm', {
+    //   metric: service.metricMemoryUtilization(),
+    //   threshold: 80,
+    //   evaluationPeriods: 2
+    // })
 
-    cpuAlarm.addAlarmAction(new cloudwatch_actions.SnsAction(topic))
-    memoryAlarm.addAlarmAction(new cloudwatch_actions.SnsAction(topic))
+    // cpuAlarm.addAlarmAction(new cloudwatch_actions.SnsAction(topic))
+    // memoryAlarm.addAlarmAction(new cloudwatch_actions.SnsAction(topic))
 
-    // TODO: for some reason EC2 instances don't have inbound SG rules attached
-    const ecsSecurityGroup = new ec2.SecurityGroup(this, 'EcsSecurityGroup', {
-      vpc: props.vpc,
-      allowAllOutbound: true
-    })
-    ecsSecurityGroup.addIngressRule(
-      ec2.Peer.ipv4(props.cidrBlock),
-      ec2.Port.tcp(props.serverPort),
-      'Allow traffic to server port'
-    )
-    ecsSecurityGroup.connections.allowFrom(
-      loadBalancer,
-      ec2.Port.tcp(props.serverPort)
-    )
-    service.connections.addSecurityGroup(ecsSecurityGroup)
+    // // TODO: for some reason EC2 instances don't have inbound SG rules attached
+    // const ecsSecurityGroup = new ec2.SecurityGroup(this, 'EcsSecurityGroup', {
+    //   vpc: props.vpc,
+    //   allowAllOutbound: true
+    // })
+    // ecsSecurityGroup.addIngressRule(
+    //   ec2.Peer.ipv4(props.cidrBlock),
+    //   ec2.Port.tcp(props.serverPort),
+    //   'Allow traffic to server port'
+    // )
+    // ecsSecurityGroup.connections.allowFrom(
+    //   loadBalancer,
+    //   ec2.Port.tcp(props.serverPort)
+    // )
+    // service.connections.addSecurityGroup(ecsSecurityGroup)
 
-    if (props.service === 'sequencer') {
-      const volume = new ec2.CfnVolume(this, 'SequencerPersistentVolume', {
-        availabilityZone: props.vpc.availabilityZones[0],
-        size: 20,
-        volumeType: 'gp2'
-      })
+    // if (props.service === 'sequencer') {
+    //   const volume = new ec2.CfnVolume(this, 'SequencerPersistentVolume', {
+    //     availabilityZone: props.vpc.availabilityZones[0],
+    //     size: 20,
+    //     volumeType: 'gp2'
+    //   })
 
-      autoScalingGroup.autoScalingGroup.addUserData(
-        `aws ec2 attach-volume --volume-id ${volume.ref} --instance-id $(curl -s http://169.254.169.254/latest/meta-data/instance-id) --device /dev/sdf`
-      )
+    //   // autoScalingGroup.autoScalingGroup.addUserData(
+    //   //   `aws ec2 attach-volume --volume-id ${volume.ref} --instance-id $(curl -s http://169.254.169.254/latest/meta-data/instance-id) --device /dev/sdf`
+    //   // )
 
-      const volumeAlarm = new cloudwatch.Alarm(this, 'VolumeUsageAlarm', {
-        metric: new cloudwatch.Metric({
-          namespace: 'AWS/EBS',
-          metricName: 'VolumeConsumedReadWriteOps',
-          dimensionsMap: {
-            VolumeId: volume.ref
-          }
-        }),
-        threshold: 90,
-        evaluationPeriods: 2,
-        comparisonOperator:
-          cloudwatch.ComparisonOperator.GREATER_THAN_OR_EQUAL_TO_THRESHOLD
-      })
+    //   const volumeAlarm = new cloudwatch.Alarm(this, 'VolumeUsageAlarm', {
+    //     metric: new cloudwatch.Metric({
+    //       namespace: 'AWS/EBS',
+    //       metricName: 'VolumeConsumedReadWriteOps',
+    //       dimensionsMap: {
+    //         VolumeId: volume.ref
+    //       }
+    //     }),
+    //     threshold: 90,
+    //     evaluationPeriods: 2,
+    //     comparisonOperator:
+    //       cloudwatch.ComparisonOperator.GREATER_THAN_OR_EQUAL_TO_THRESHOLD
+    //   })
 
-      const lambdaRole = new iam.Role(this, 'LambdaRole', {
-        assumedBy: new iam.ServicePrincipal('lambda.amazonaws.com'),
-        managedPolicies: [
-          iam.ManagedPolicy.fromAwsManagedPolicyName(
-            'service-role/AWSLambdaBasicExecutionRole'
-          ),
-          iam.ManagedPolicy.fromAwsManagedPolicyName('AmazonEC2FullAccess')
-        ]
-      })
+    //   const lambdaRole = new iam.Role(this, 'LambdaRole', {
+    //     assumedBy: new iam.ServicePrincipal('lambda.amazonaws.com'),
+    //     managedPolicies: [
+    //       iam.ManagedPolicy.fromAwsManagedPolicyName(
+    //         'service-role/AWSLambdaBasicExecutionRole'
+    //       ),
+    //       iam.ManagedPolicy.fromAwsManagedPolicyName('AmazonEC2FullAccess')
+    //     ]
+    //   })
 
-      const volumeExpansionFunction = new lambda.Function(
-        this,
-        'VolumeExpansionFunction',
-        {
-          runtime: lambda.Runtime.NODEJS_LATEST,
-          handler: 'index.handler',
-          code: lambda.Code.fromAsset(
-            __dirname + './../lambda-handlers/scale-sequencer-volume'
-          ),
-          role: lambdaRole
-        }
-      )
+    //   const volumeExpansionFunction = new lambda.Function(
+    //     this,
+    //     'VolumeExpansionFunction',
+    //     {
+    //       runtime: lambda.Runtime.NODEJS_LATEST,
+    //       handler: 'index.handler',
+    //       code: lambda.Code.fromAsset(
+    //         __dirname + './../lambda-handlers/scale-sequencer-volume'
+    //       ),
+    //       role: lambdaRole
+    //     }
+    //   )
 
-      volumeAlarm.addAlarmAction(
-        new cloudwatch_actions.LambdaAction(volumeExpansionFunction)
-      )
-    }
+    //   volumeAlarm.addAlarmAction(
+    //     new cloudwatch_actions.LambdaAction(volumeExpansionFunction)
+    //   )
+    // }
   }
 }
