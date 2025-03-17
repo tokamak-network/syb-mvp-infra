@@ -160,9 +160,9 @@ export class SybMvpStack extends cdk.Stack {
         serverPort: props.sequencerPort,
         domainName: props.sequencerDomain,
         cluster,
-        initialImageTag: props.sequencerInitialImageTag
-        // maxEc2ScalingCapacity: 1,
-        // maxTaskScalingCapacity: 1
+        initialImageTag: props.sequencerInitialImageTag,
+        maxEc2ScalingCapacity: 1,
+        maxTaskScalingCapacity: 1
       })
 
       new RdsConstruct(this, 'RdsConstruct', {
@@ -187,9 +187,9 @@ export class SybMvpStack extends cdk.Stack {
         serverPort: props.circuitPort,
         domainName: props.circuitDomain,
         cluster,
-        initialImageTag: props.circuitInitialImageTag
-        // maxEc2ScalingCapacity: 1,
-        // maxTaskScalingCapacity: 1
+        initialImageTag: props.circuitInitialImageTag,
+        maxEc2ScalingCapacity: 1,
+        maxTaskScalingCapacity: 1
       })
     }
 
