@@ -69,7 +69,7 @@ new SybMvpStack(app, 'SybMvpMainStack', {
   circuitInitialImageTag: CIRCUIT_MAIN_INITIAL_IMAGE_TAG
 })
 
-new SybMvpStack(app, 'SybMvpTestStack-1', {
+new SybMvpStack(app, 'SybMvpTestStack', {
   cidrBlock: CIDR_BLOCK,
   slackWebhookUrl: SLACK_WEBHOOK_URL,
   route53DomainName: ROUTE53_DOMAIN_NAME,

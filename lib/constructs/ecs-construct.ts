@@ -124,13 +124,10 @@ export class EcsConstruct extends Construct {
 
     const service = new ecs.Ec2Service(this, 'Ec2Service', {
       cluster: props.cluster,
-      taskDefinition,
-      deploymentController: {
-        type: ecs.DeploymentControllerType.CODE_DEPLOY
-      }
+      taskDefinition
     })
 
-    const blueTargetGroup = listener.addTargets('BlueTargetGroup', {
+    const targetGroup = listener.addTargets('TargetGroup', {
       port: props.serverPort,
       targets: [service],
       protocol: elbv2.ApplicationProtocol.HTTP,
@@ -141,39 +138,6 @@ export class EcsConstruct extends Construct {
         healthyThresholdCount: 2,
         unhealthyThresholdCount: 5
       }
-    })
-
-    const greenTargetGroup = new elbv2.ApplicationTargetGroup(
-      this,
-      'GreenTargetGroup',
-      {
-        vpc: props.vpc,
-        port: props.serverPort,
-        targetType: elbv2.TargetType.INSTANCE,
-        protocol: elbv2.ApplicationProtocol.HTTP,
-        healthCheck: {
-          path: '/v1/health',
-          interval: cdk.Duration.seconds(30),
-          timeout: cdk.Duration.seconds(3),
-          healthyThresholdCount: 2,
-          unhealthyThresholdCount: 5
-        }
-      }
-    )
-
-    const codeDeployApp = new codedeploy.EcsApplication(this, 'CodeDeployApp', {
-      applicationName: props.service
-    })
-
-    new codedeploy.EcsDeploymentGroup(this, 'BlueGreenDG', {
-      application: codeDeployApp,
-      service,
-      blueGreenDeploymentConfig: {
-        blueTargetGroup,
-        greenTargetGroup,
-        listener
-      },
-      deploymentConfig: codedeploy.EcsDeploymentConfig.CANARY_10PERCENT_5MINUTES
     })
 
     const scaling = service.autoScaleTaskCount({
