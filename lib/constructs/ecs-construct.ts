@@ -21,8 +21,8 @@ interface EcsConstructProps extends cdk.StackProps {
   cidrBlock: string
   serverPort: number
   domainName: string
-  slackWebhookUrl: string
-  slackNotifier: lambda.Function
+  // slackWebhookUrl: string
+  // slackNotifier: lambda.Function
   ecrRepo: ecr.IRepository
   route53: route53.IHostedZone
   service: Service
@@ -87,7 +87,8 @@ export class EcsConstruct extends Construct {
 
     instanceSG.connections.allowFrom(
       loadBalancer,
-      ec2.Port.tcp(props.serverPort)
+      ec2.Port.tcpRange(32768, 65535),
+      'Allow traffic from ALB to container instances'
     )
 
     props.cluster.addAsgCapacityProvider(autoScalingGroup)
@@ -118,19 +119,15 @@ export class EcsConstruct extends Construct {
 
     container.addPortMappings({
       containerPort: props.serverPort,
-      // TODO: experimental, for some reason requests are not reaching the container
-      hostPort: props.serverPort
+      hostPort: 0
     })
 
     const service = new ecs.Ec2Service(this, 'Ec2Service', {
       cluster: props.cluster,
-      taskDefinition,
-      deploymentController: {
-        type: ecs.DeploymentControllerType.CODE_DEPLOY
-      }
+      taskDefinition
     })
 
-    const blueTargetGroup = listener.addTargets('BlueTargetGroup', {
+    const targetGroup = listener.addTargets('TargetGroup', {
       port: props.serverPort,
       targets: [service],
       protocol: elbv2.ApplicationProtocol.HTTP,
@@ -141,39 +138,6 @@ export class EcsConstruct extends Construct {
         healthyThresholdCount: 2,
         unhealthyThresholdCount: 5
       }
-    })
-
-    const greenTargetGroup = new elbv2.ApplicationTargetGroup(
-      this,
-      'GreenTargetGroup',
-      {
-        vpc: props.vpc,
-        port: props.serverPort,
-        targetType: elbv2.TargetType.INSTANCE,
-        protocol: elbv2.ApplicationProtocol.HTTP,
-        healthCheck: {
-          path: '/v1/health',
-          interval: cdk.Duration.seconds(30),
-          timeout: cdk.Duration.seconds(3),
-          healthyThresholdCount: 2,
-          unhealthyThresholdCount: 5
-        }
-      }
-    )
-
-    const codeDeployApp = new codedeploy.EcsApplication(this, 'CodeDeployApp', {
-      applicationName: props.service
-    })
-
-    new codedeploy.EcsDeploymentGroup(this, 'BlueGreenDG', {
-      application: codeDeployApp,
-      service,
-      blueGreenDeploymentConfig: {
-        blueTargetGroup,
-        greenTargetGroup,
-        listener
-      },
-      deploymentConfig: codedeploy.EcsDeploymentConfig.CANARY_10PERCENT_5MINUTES
     })
 
     const scaling = service.autoScaleTaskCount({
@@ -194,43 +158,49 @@ export class EcsConstruct extends Construct {
       )
     })
 
-    const topic = new sns.Topic(
-      this,
-      `AlarmTopic-${props.service}-${props.deploymentEnv}`
-    )
-    topic.addSubscription(
-      new sns_subscriptions.LambdaSubscription(props.slackNotifier)
-    )
+    // const topic = new sns.Topic(
+    //   this,
+    //   `AlarmTopic-${props.service}-${props.deploymentEnv}`
+    // )
+    // topic.addSubscription(
+    //   new sns_subscriptions.LambdaSubscription(props.slackNotifier)
+    // )
 
-    const cpuAlarm = new cloudwatch.Alarm(this, 'CpuAlarm', {
-      metric: service.metricCpuUtilization(),
-      threshold: 90,
-      evaluationPeriods: 2
-    })
+    // const cpuAlarm = new cloudwatch.Alarm(this, 'CpuAlarm', {
+    //   metric: service.metricCpuUtilization(),
+    //   threshold: 90,
+    //   evaluationPeriods: 2
+    // })
 
-    const memoryAlarm = new cloudwatch.Alarm(this, 'MemoryAlarm', {
-      metric: service.metricMemoryUtilization(),
-      threshold: 80,
-      evaluationPeriods: 2
-    })
+    // const memoryAlarm = new cloudwatch.Alarm(this, 'MemoryAlarm', {
+    //   metric: service.metricMemoryUtilization(),
+    //   threshold: 80,
+    //   evaluationPeriods: 2
+    // })
 
-    cpuAlarm.addAlarmAction(new cloudwatch_actions.SnsAction(topic))
-    memoryAlarm.addAlarmAction(new cloudwatch_actions.SnsAction(topic))
+    // cpuAlarm.addAlarmAction(new cloudwatch_actions.SnsAction(topic))
+    // memoryAlarm.addAlarmAction(new cloudwatch_actions.SnsAction(topic))
 
     // TODO: for some reason EC2 instances don't have inbound SG rules attached
     const ecsSecurityGroup = new ec2.SecurityGroup(this, 'EcsSecurityGroup', {
       vpc: props.vpc,
-      allowAllOutbound: true
+      allowAllOutbound: true,
+      description: 'Security group for ECS service'
     })
+
+    ecsSecurityGroup.connections.allowFrom(
+      loadBalancer,
+      ec2.Port.tcpRange(32768, 65535),
+      'Allow traffic from ALB to ECS tasks'
+    )
+
     ecsSecurityGroup.addIngressRule(
       ec2.Peer.ipv4(props.cidrBlock),
       ec2.Port.tcp(props.serverPort),
-      'Allow traffic to server port'
+      'Allow traffic from CIDR block'
     )
-    ecsSecurityGroup.connections.allowFrom(
-      loadBalancer,
-      ec2.Port.tcp(props.serverPort)
-    )
+
+    autoScalingGroup.autoScalingGroup.addSecurityGroup(ecsSecurityGroup)
     service.connections.addSecurityGroup(ecsSecurityGroup)
 
     if (props.service === 'sequencer') {
