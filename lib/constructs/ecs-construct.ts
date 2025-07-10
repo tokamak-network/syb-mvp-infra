@@ -93,7 +93,16 @@ export class EcsConstruct extends Construct {
 
     props.cluster.addAsgCapacityProvider(autoScalingGroup)
 
-    const taskDefinition = new ecs.Ec2TaskDefinition(this, 'TaskDef')
+    const taskDefinition = new ecs.Ec2TaskDefinition(this, 'TaskDef', {
+      volumes: [
+        {
+          name: 'stateDB-volume',
+          host: {
+            sourcePath: '/mnt/stateDB'
+          }
+        }
+      ]
+    })
     taskDefinition.taskRole.addManagedPolicy(
       iam.ManagedPolicy.fromAwsManagedPolicyName('SecretsManagerReadWrite')
     )
@@ -120,6 +129,12 @@ export class EcsConstruct extends Construct {
     container.addPortMappings({
       containerPort: props.serverPort,
       hostPort: 0
+    })
+
+    container.addMountPoints({
+      sourceVolume: 'stateDB-volume',
+      containerPath: '/app/var',
+      readOnly: false
     })
 
     const service = new ecs.Ec2Service(this, 'Ec2Service', {
@@ -211,7 +226,26 @@ export class EcsConstruct extends Construct {
       })
 
       autoScalingGroup.autoScalingGroup.addUserData(
-        `aws ec2 attach-volume --volume-id ${volume.ref} --instance-id $(curl -s http://169.254.169.254/latest/meta-data/instance-id) --device /dev/sdf`
+        `#!/bin/bash
+        aws ec2 attach-volume --volume-id ${volume.ref} --instance-id $(curl -s http://169.254.169.254/latest/meta-data/instance-id) --device /dev/sdf
+      
+        DEVICE=/dev/xvdf
+        MOUNT_POINT=/mnt/stateDB
+      
+        while [ ! -e $DEVICE ]; do sleep 1; done
+      
+        if ! file -s $DEVICE | grep -q ext4; then
+          mkfs -t ext4 $DEVICE
+        fi
+      
+        mkdir -p $MOUNT_POINT
+        mount $DEVICE $MOUNT_POINT
+      
+        grep -q $DEVICE /etc/fstab || echo "$DEVICE $MOUNT_POINT ext4 defaults,nofail 0 2" >> /etc/fstab
+      
+        chown ec2-user:ec2-user $MOUNT_POINT
+        chmod 755 $MOUNT_POINT
+        `
       )
 
       const volumeAlarm = new cloudwatch.Alarm(this, 'VolumeUsageAlarm', {
