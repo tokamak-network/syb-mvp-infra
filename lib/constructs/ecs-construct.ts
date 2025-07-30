@@ -21,8 +21,8 @@ interface EcsConstructProps extends cdk.StackProps {
   cidrBlock: string
   serverPort: number
   domainName: string
-  // slackWebhookUrl: string
-  // slackNotifier: lambda.Function
+  slackWebhookUrl: string
+  slackNotifier: lambda.Function
   ecrRepo: ecr.IRepository
   route53: route53.IHostedZone
   service: Service
@@ -173,28 +173,28 @@ export class EcsConstruct extends Construct {
       )
     })
 
-    // const topic = new sns.Topic(
-    //   this,
-    //   `AlarmTopic-${props.service}-${props.deploymentEnv}`
-    // )
-    // topic.addSubscription(
-    //   new sns_subscriptions.LambdaSubscription(props.slackNotifier)
-    // )
+    const topic = new sns.Topic(
+      this,
+      `AlarmTopic-${props.service}-${props.deploymentEnv}`
+    )
+    topic.addSubscription(
+      new sns_subscriptions.LambdaSubscription(props.slackNotifier)
+    )
 
-    // const cpuAlarm = new cloudwatch.Alarm(this, 'CpuAlarm', {
-    //   metric: service.metricCpuUtilization(),
-    //   threshold: 90,
-    //   evaluationPeriods: 2
-    // })
+    const cpuAlarm = new cloudwatch.Alarm(this, 'CpuAlarm', {
+      metric: service.metricCpuUtilization(),
+      threshold: 90,
+      evaluationPeriods: 2
+    })
 
-    // const memoryAlarm = new cloudwatch.Alarm(this, 'MemoryAlarm', {
-    //   metric: service.metricMemoryUtilization(),
-    //   threshold: 80,
-    //   evaluationPeriods: 2
-    // })
+    const memoryAlarm = new cloudwatch.Alarm(this, 'MemoryAlarm', {
+      metric: service.metricMemoryUtilization(),
+      threshold: 80,
+      evaluationPeriods: 2
+    })
 
-    // cpuAlarm.addAlarmAction(new cloudwatch_actions.SnsAction(topic))
-    // memoryAlarm.addAlarmAction(new cloudwatch_actions.SnsAction(topic))
+    cpuAlarm.addAlarmAction(new cloudwatch_actions.SnsAction(topic))
+    memoryAlarm.addAlarmAction(new cloudwatch_actions.SnsAction(topic))
 
     // TODO: for some reason EC2 instances don't have inbound SG rules attached
     const ecsSecurityGroup = new ec2.SecurityGroup(this, 'EcsSecurityGroup', {

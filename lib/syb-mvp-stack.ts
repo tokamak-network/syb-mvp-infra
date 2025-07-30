@@ -8,6 +8,7 @@ import * as budgets from 'aws-cdk-lib/aws-budgets'
 import * as sns from 'aws-cdk-lib/aws-sns'
 import * as ecs from 'aws-cdk-lib/aws-ecs'
 import * as sns_subscriptions from 'aws-cdk-lib/aws-sns-subscriptions'
+import * as iam from 'aws-cdk-lib/aws-iam'
 import * as dotenv from 'dotenv'
 import { EcsConstruct } from './constructs/ecs-construct'
 import { RdsConstruct } from './constructs/rds-construct'
@@ -31,7 +32,7 @@ interface SybMvpStackProps extends cdk.StackProps {
 
 export class SybMvpStack extends cdk.Stack {
   public readonly vpc: ec2.Vpc
-  // public readonly slackNotifier: lambda.Function
+  public readonly slackNotifier: lambda.Function
   public readonly ecrRepo: ecr.IRepository
   public readonly route53: route53.IHostedZone
 
@@ -56,16 +57,16 @@ export class SybMvpStack extends cdk.Stack {
       ]
     })
 
-    // this.slackNotifier = new lambda.Function(this, 'SlackNotifier', {
-    //   runtime: lambda.Runtime.NODEJS_LATEST,
-    //   handler: 'index.handler',
-    //   code: lambda.Code.fromAsset(
-    //     __dirname + '/lambda-handlers/slack-notifier'
-    //   ),
-    //   environment: {
-    //     SLACK_WEBHOOK_URL: props.slackWebhookUrl
-    //   }
-    // })
+    this.slackNotifier = new lambda.Function(this, 'SlackNotifier', {
+      runtime: lambda.Runtime.NODEJS_LATEST,
+      handler: 'index.handler',
+      code: lambda.Code.fromAsset(
+        __dirname + '/lambda-handlers/slack-notifier'
+      ),
+      environment: {
+        SLACK_WEBHOOK_URL: props.slackWebhookUrl
+      }
+    })
 
     this.ecrRepo = ecr.Repository.fromRepositoryName(
       this,
@@ -83,65 +84,74 @@ export class SybMvpStack extends cdk.Stack {
     //   value: cdk.Fn.join(', ', this.route53.hostedZoneNameServers || [])
     // })
 
-    // const budgetNotificationTopic = new sns.Topic(
-    //   this,
-    //   'BudgetNotificationTopic'
-    // )
+    const budgetNotificationTopic = new sns.Topic(
+      this,
+      'BudgetNotificationTopic'
+    )
 
-    // const budgetNotifier = new lambda.Function(this, 'BudgetNotifier', {
-    //   runtime: lambda.Runtime.NODEJS_LATEST,
-    //   handler: 'index.handler',
-    //   code: lambda.Code.fromAsset(
-    //     __dirname + '/lambda-handlers/budget-notifier'
-    //   ),
-    //   environment: {
-    //     SLACK_WEBHOOK_URL: props.slackWebhookUrl
-    //   }
-    // })
+    budgetNotificationTopic.addToResourcePolicy(
+      new iam.PolicyStatement({
+        effect: iam.Effect.ALLOW,
+        principals: [new iam.ServicePrincipal('budgets.amazonaws.com')],
+        actions: ['SNS:Publish'],
+        resources: [budgetNotificationTopic.topicArn]
+      })
+    )
 
-    // budgetNotificationTopic.addSubscription(
-    //   new sns_subscriptions.LambdaSubscription(budgetNotifier)
-    // )
+    const budgetNotifier = new lambda.Function(this, 'BudgetNotifier', {
+      runtime: lambda.Runtime.NODEJS_LATEST,
+      handler: 'index.handler',
+      code: lambda.Code.fromAsset(
+        __dirname + '/lambda-handlers/budget-notifier'
+      ),
+      environment: {
+        SLACK_WEBHOOK_URL: props.slackWebhookUrl
+      }
+    })
 
-    // new budgets.CfnBudget(this, 'MonthlyBudget', {
-    //   budget: {
-    //     budgetName: 'MonthlyBudget',
-    //     budgetLimit: {
-    //       amount: props.monthlyBudgetLimit,
-    //       unit: 'USD'
-    //     },
-    //     budgetType: 'COST',
-    //     timeUnit: 'MONTHLY'
-    //   },
-    //   notificationsWithSubscribers: [
-    //     {
-    //       notification: {
-    //         notificationType: 'FORECASTED',
-    //         threshold: 100,
-    //         comparisonOperator: 'GREATER_THAN'
-    //       },
-    //       subscribers: [
-    //         {
-    //           subscriptionType: 'SNS',
-    //           address: budgetNotificationTopic.topicArn
-    //         }
-    //       ]
-    //     },
-    //     {
-    //       notification: {
-    //         notificationType: 'ACTUAL',
-    //         threshold: 90,
-    //         comparisonOperator: 'GREATER_THAN'
-    //       },
-    //       subscribers: [
-    //         {
-    //           subscriptionType: 'SNS',
-    //           address: budgetNotificationTopic.topicArn
-    //         }
-    //       ]
-    //     }
-    //   ]
-    // })
+    budgetNotificationTopic.addSubscription(
+      new sns_subscriptions.LambdaSubscription(budgetNotifier)
+    )
+
+    new budgets.CfnBudget(this, 'MonthlyBudget', {
+      budget: {
+        budgetName: 'MonthlyBudget',
+        budgetLimit: {
+          amount: props.monthlyBudgetLimit,
+          unit: 'USD'
+        },
+        budgetType: 'COST',
+        timeUnit: 'MONTHLY'
+      },
+      notificationsWithSubscribers: [
+        {
+          notification: {
+            notificationType: 'FORECASTED',
+            threshold: 100,
+            comparisonOperator: 'GREATER_THAN'
+          },
+          subscribers: [
+            {
+              subscriptionType: 'SNS',
+              address: budgetNotificationTopic.topicArn
+            }
+          ]
+        },
+        {
+          notification: {
+            notificationType: 'ACTUAL',
+            threshold: 90,
+            comparisonOperator: 'GREATER_THAN'
+          },
+          subscribers: [
+            {
+              subscriptionType: 'SNS',
+              address: budgetNotificationTopic.topicArn
+            }
+          ]
+        }
+      ]
+    })
 
     const cluster = new ecs.Cluster(this, 'EcsCluster', {
       vpc: this.vpc
@@ -150,10 +160,10 @@ export class SybMvpStack extends cdk.Stack {
     if (process.env.DEPLOY_SEQUENCER === 'true') {
       new EcsConstruct(this, 'SequencerEcsConstruct', {
         vpc: this.vpc,
-        // slackNotifier: this.slackNotifier,
+        slackNotifier: this.slackNotifier,
         ecrRepo: this.ecrRepo,
         route53: this.route53,
-        // slackWebhookUrl: props.slackWebhookUrl,
+        slackWebhookUrl: props.slackWebhookUrl,
         cidrBlock: props.cidrBlock,
         service: 'sequencer',
         deploymentEnv: props.deploymentEnv,
@@ -177,10 +187,10 @@ export class SybMvpStack extends cdk.Stack {
       // update EcsConstruct to support serverless
       new EcsConstruct(this, 'CircuitEcsConstruct', {
         vpc: this.vpc,
-        // slackNotifier: this.slackNotifier,
+        slackNotifier: this.slackNotifier,
         ecrRepo: this.ecrRepo,
         route53: this.route53,
-        // slackWebhookUrl: props.slackWebhookUrl,
+        slackWebhookUrl: props.slackWebhookUrl,
         cidrBlock: props.cidrBlock,
         service: 'circuit',
         deploymentEnv: props.deploymentEnv,

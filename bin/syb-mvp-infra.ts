@@ -73,7 +73,7 @@ new SybMvpStack(app, 'SybMvpTestStack', {
   cidrBlock: CIDR_BLOCK,
   slackWebhookUrl: SLACK_WEBHOOK_URL,
   route53DomainName: ROUTE53_DOMAIN_NAME,
-  monthlyBudgetLimit: 300,
+  monthlyBudgetLimit: 200,
   deploymentEnv: 'test',
   sequencerDomain: SEQUENCER_TEST_DOMAIN,
   sequencerPort: parseInt(SEQUENCER_TEST_PORT),
