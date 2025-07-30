@@ -153,6 +153,33 @@ export class SybMvpStack extends cdk.Stack {
       ]
     })
 
+    new budgets.CfnBudget(this, 'DailyBudget', {
+      budget: {
+        budgetName: 'DailyBudget',
+        budgetLimit: {
+          amount: props.monthlyBudgetLimit / 30,
+          unit: 'USD'
+        },
+        budgetType: 'COST',
+        timeUnit: 'DAILY'
+      },
+      notificationsWithSubscribers: [
+        {
+          notification: {
+            notificationType: 'ACTUAL',
+            comparisonOperator: 'GREATER_THAN',
+            threshold: 0
+          },
+          subscribers: [
+            {
+              subscriptionType: 'SNS',
+              address: budgetNotificationTopic.topicArn
+            }
+          ]
+        }
+      ]
+    })
+
     const cluster = new ecs.Cluster(this, 'EcsCluster', {
       vpc: this.vpc
     })
