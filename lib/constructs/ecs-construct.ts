@@ -112,7 +112,7 @@ export class EcsConstruct extends Construct {
         props.ecrRepo,
         props.initialImageTag
       ),
-      memoryReservationMiB: 2048,
+      memoryReservationMiB: 1536,
       cpu: 1024,
       logging: ecs.LogDrivers.awsLogs({ streamPrefix: 'ecs' }),
       healthCheck: {
@@ -123,7 +123,12 @@ export class EcsConstruct extends Construct {
         interval: cdk.Duration.seconds(30),
         timeout: cdk.Duration.seconds(5),
         retries: 5
-      }
+      },
+      command: [
+        '/bin/sh',
+        '-c',
+        'find /app/var -type f -name LOCK -exec rm -f {} + && chown -R 1000:1000 /app/var && exec go run main.go'
+      ]
     })
 
     container.addPortMappings({
@@ -139,7 +144,8 @@ export class EcsConstruct extends Construct {
 
     const service = new ecs.Ec2Service(this, 'Ec2Service', {
       cluster: props.cluster,
-      taskDefinition
+      taskDefinition,
+      desiredCount: 1
     })
 
     const targetGroup = listener.addTargets('TargetGroup', {
@@ -245,6 +251,8 @@ export class EcsConstruct extends Construct {
       
         chown ec2-user:ec2-user $MOUNT_POINT
         chmod 755 $MOUNT_POINT
+
+        echo "Volume setup completed successfully."
         `
       )
 
