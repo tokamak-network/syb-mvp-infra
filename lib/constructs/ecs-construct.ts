@@ -12,8 +12,9 @@ import * as sns_subscriptions from 'aws-cdk-lib/aws-sns-subscriptions'
 import * as cloudwatch_actions from 'aws-cdk-lib/aws-cloudwatch-actions'
 import * as autoscaling from 'aws-cdk-lib/aws-autoscaling'
 import * as iam from 'aws-cdk-lib/aws-iam'
-import * as codedeploy from 'aws-cdk-lib/aws-codedeploy'
 import * as elbv2 from 'aws-cdk-lib/aws-elasticloadbalancingv2'
+// Import the EFS library
+import * as efs from 'aws-cdk-lib/aws-efs'
 import { Env, Service } from '../types'
 
 interface EcsConstructProps extends cdk.StackProps {
@@ -53,6 +54,16 @@ export class EcsConstruct extends Construct {
     ecsInstanceRole.addManagedPolicy(
       iam.ManagedPolicy.fromAwsManagedPolicyName('AmazonSSMManagedInstanceCore')
     )
+    // Add policy to allow EC2 instances to connect to EFS
+    ecsInstanceRole.addManagedPolicy(
+      iam.ManagedPolicy.fromAwsManagedPolicyName(
+        'AmazonElasticFileSystemClientFullAccess'
+      )
+    )
+
+    // Create a UserData script to install the EFS utilities
+    const userData = ec2.UserData.forLinux()
+    userData.addCommands('yum install -y amazon-efs-utils')
 
     const autoScalingGroup = new ecs.AsgCapacityProvider(
       this,
@@ -67,11 +78,17 @@ export class EcsConstruct extends Construct {
             machineImage: ecs.EcsOptimizedImage.amazonLinux2(),
             minCapacity: 1,
             role: ecsInstanceRole,
-
-            // An EBS volume can only be used by a single instance at a time
-            // This is why we set maxCapacity to 1 for the sequencer service
-            // Need to figure out a better way to handle this
-            maxCapacity: props.maxEc2ScalingCapacity
+            // With EFS, we are no longer constrained to a single instance
+            maxCapacity: props.maxEc2ScalingCapacity,
+            // Add the UserData script to the ASG
+            userData: userData,
+            // Add an update policy for smooth deployments
+            updatePolicy: autoscaling.UpdatePolicy.rollingUpdate({
+              minInstancesInService: 1,
+              maxBatchSize: 1,
+              waitOnResourceSignals: true,
+              pauseTime: cdk.Duration.minutes(10)
+            })
           }
         )
       }
@@ -93,16 +110,81 @@ export class EcsConstruct extends Construct {
 
     props.cluster.addAsgCapacityProvider(autoScalingGroup)
 
-    const taskDefinition = new ecs.Ec2TaskDefinition(this, 'TaskDef', {
-      volumes: [
-        {
-          name: 'stateDB-volume',
-          host: {
-            sourcePath: '/mnt/stateDB'
+    // =================================================================
+    // SECTION for EFS file system and Task Definition
+    // =================================================================
+    let efsVolumeConfig: ecs.Volume | undefined
+    let fileSystem: efs.FileSystem | undefined
+    let accessPoint: efs.AccessPoint | undefined
+
+    if (props.service === 'sequencer') {
+      // 1. Create a persistent, elastic file system (EFS)
+      fileSystem = new efs.FileSystem(this, 'StateDBFileSystem', {
+        vpc: props.vpc,
+        performanceMode: efs.PerformanceMode.GENERAL_PURPOSE,
+        encrypted: true,
+        lifecyclePolicy: efs.LifecyclePolicy.AFTER_14_DAYS,
+        removalPolicy: cdk.RemovalPolicy.DESTROY
+      })
+
+      // 2. Create an EFS Access Point for better permission management
+      accessPoint = fileSystem.addAccessPoint('AccessPoint', {
+        path: '/data', // A dedicated directory within the EFS
+        createAcl: {
+          ownerGid: '1000',
+          ownerUid: '1000',
+          permissions: '0777' // security: open to everyone
+        },
+        posixUser: {
+          gid: '1000',
+          uid: '1000'
+        }
+      })
+
+      // 3. Configure a security group for the EFS mount targets
+      fileSystem.connections.allowDefaultPortFrom(instanceSG)
+
+      // 4. Define the volume configuration for the task definition
+      efsVolumeConfig = {
+        name: 'stateDB-volume',
+        efsVolumeConfiguration: {
+          fileSystemId: fileSystem.fileSystemId,
+          transitEncryption: 'ENABLED',
+          // Use the access point to mount the volume
+          authorizationConfig: {
+            accessPointId: accessPoint.accessPointId,
+            iam: 'ENABLED'
           }
         }
-      ]
+      }
+    }
+
+    const taskDefinition = new ecs.Ec2TaskDefinition(this, 'TaskDef', {
+      // Add the EFS volume to the task definition if it exists
+      volumes: efsVolumeConfig ? [efsVolumeConfig] : []
     })
+
+    // Add permissions for the task to connect to the EFS via the access point
+    if (props.service === 'sequencer' && fileSystem && accessPoint) {
+      // CORRECTED IAM POLICY
+      taskDefinition.taskRole.addToPrincipalPolicy(
+        new iam.PolicyStatement({
+          actions: [
+            'elasticfilesystem:ClientMount',
+            'elasticfilesystem:ClientWrite',
+            'elasticfilesystem:DescribeMountTargets'
+          ],
+          resources: [fileSystem.fileSystemArn],
+          // Condition to only allow access through the defined access point
+          conditions: {
+            StringEquals: {
+              'elasticfilesystem:AccessPointArn': accessPoint.accessPointArn
+            }
+          }
+        })
+      )
+    }
+
     taskDefinition.taskRole.addManagedPolicy(
       iam.ManagedPolicy.fromAwsManagedPolicyName('SecretsManagerReadWrite')
     )
@@ -136,16 +218,18 @@ export class EcsConstruct extends Construct {
       hostPort: 0
     })
 
-    container.addMountPoints({
-      sourceVolume: 'stateDB-volume',
-      containerPath: '/app/var',
-      readOnly: false
-    })
+    // If the EFS volume was defined, mount it to the container
+    if (efsVolumeConfig) {
+      container.addMountPoints({
+        sourceVolume: efsVolumeConfig.name,
+        containerPath: '/app/var', // The path inside your container
+        readOnly: false
+      })
+    }
 
     const service = new ecs.Ec2Service(this, 'Ec2Service', {
       cluster: props.cluster,
-      taskDefinition,
-      desiredCount: 1
+      taskDefinition
     })
 
     const targetGroup = listener.addTargets('TargetGroup', {
@@ -202,7 +286,6 @@ export class EcsConstruct extends Construct {
     cpuAlarm.addAlarmAction(new cloudwatch_actions.SnsAction(topic))
     memoryAlarm.addAlarmAction(new cloudwatch_actions.SnsAction(topic))
 
-    // TODO: for some reason EC2 instances don't have inbound SG rules attached
     const ecsSecurityGroup = new ec2.SecurityGroup(this, 'EcsSecurityGroup', {
       vpc: props.vpc,
       allowAllOutbound: true,
@@ -223,79 +306,5 @@ export class EcsConstruct extends Construct {
 
     autoScalingGroup.autoScalingGroup.addSecurityGroup(ecsSecurityGroup)
     service.connections.addSecurityGroup(ecsSecurityGroup)
-
-    if (props.service === 'sequencer') {
-      const volume = new ec2.CfnVolume(this, 'SequencerPersistentVolume', {
-        availabilityZone: props.vpc.availabilityZones[0],
-        size: 20,
-        volumeType: 'gp2'
-      })
-
-      autoScalingGroup.autoScalingGroup.addUserData(
-        `#!/bin/bash
-        aws ec2 attach-volume --volume-id ${volume.ref} --instance-id $(curl -s http://169.254.169.254/latest/meta-data/instance-id) --device /dev/sdf
-      
-        DEVICE=/dev/xvdf
-        MOUNT_POINT=/mnt/stateDB
-      
-        while [ ! -e $DEVICE ]; do sleep 1; done
-      
-        if ! file -s $DEVICE | grep -q ext4; then
-          mkfs -t ext4 $DEVICE
-        fi
-      
-        mkdir -p $MOUNT_POINT
-        mount $DEVICE $MOUNT_POINT
-      
-        grep -q $DEVICE /etc/fstab || echo "$DEVICE $MOUNT_POINT ext4 defaults,nofail 0 2" >> /etc/fstab
-      
-        chown ec2-user:ec2-user $MOUNT_POINT
-        chmod 755 $MOUNT_POINT
-
-        echo "Volume setup completed successfully."
-        `
-      )
-
-      const volumeAlarm = new cloudwatch.Alarm(this, 'VolumeUsageAlarm', {
-        metric: new cloudwatch.Metric({
-          namespace: 'AWS/EBS',
-          metricName: 'VolumeConsumedReadWriteOps',
-          dimensionsMap: {
-            VolumeId: volume.ref
-          }
-        }),
-        threshold: 90,
-        evaluationPeriods: 2,
-        comparisonOperator:
-          cloudwatch.ComparisonOperator.GREATER_THAN_OR_EQUAL_TO_THRESHOLD
-      })
-
-      const lambdaRole = new iam.Role(this, 'LambdaRole', {
-        assumedBy: new iam.ServicePrincipal('lambda.amazonaws.com'),
-        managedPolicies: [
-          iam.ManagedPolicy.fromAwsManagedPolicyName(
-            'service-role/AWSLambdaBasicExecutionRole'
-          ),
-          iam.ManagedPolicy.fromAwsManagedPolicyName('AmazonEC2FullAccess')
-        ]
-      })
-
-      const volumeExpansionFunction = new lambda.Function(
-        this,
-        'VolumeExpansionFunction',
-        {
-          runtime: lambda.Runtime.NODEJS_LATEST,
-          handler: 'index.handler',
-          code: lambda.Code.fromAsset(
-            __dirname + './../lambda-handlers/scale-sequencer-volume'
-          ),
-          role: lambdaRole
-        }
-      )
-
-      volumeAlarm.addAlarmAction(
-        new cloudwatch_actions.LambdaAction(volumeExpansionFunction)
-      )
-    }
   }
 }
